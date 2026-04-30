@@ -12,18 +12,23 @@
 #include "StelModuleMgr.hpp"
 #include "StelPainter.hpp"
 #include "StelProjector.hpp"
+#include "StelTexture.hpp"
+#include "StelTextureMgr.hpp"
 #include "StelUtils.hpp"
 #include "VecMath.hpp"
 
 #include <QDebug>
 #include <QFont>
 #include <QGuiApplication>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPainter>
+#include <QPainterPath>
 #include <QTimer>
 #include <QUrl>
 
@@ -75,6 +80,77 @@ constexpr double R_EARTH_M = 6'371'000.0;
 constexpr double DEG_TO_RAD = M_PI / 180.0;
 constexpr double RAD_TO_DEG = 180.0 / M_PI;
 
+//! Typ wizualny samolotu — port z aurora-web src/transit-detector/src/lib/aircraftIcon.tsx.
+enum class AcType { Jet, Heavy, Small, Heli, Glider, Drone };
+
+//! Mapping ADS-B emitter category + heurystyka prędkość/wysokość → typ wizualny.
+//! Identyczna logika jak `getAircraftType` we webie.
+AcType classifyAircraft(const AircraftSnapshot& a)
+{
+	const QString& cat = a.category;
+	if (cat == "A7") return AcType::Heli;
+	if (cat == "A5" || cat == "A6") return AcType::Heavy;
+	if (cat == "A1" || cat == "B4") return AcType::Small;
+	if (cat == "B1") return AcType::Glider;
+	if (cat == "B6") return AcType::Drone;
+	if (a.speedMs < 50  && a.currentAltM < 2000) return AcType::Heli;
+	if (a.speedMs < 80  && a.currentAltM < 5000) return AcType::Small;
+	return AcType::Jet;
+}
+
+//! Kolor RGB per typ — port z `typeColor` we webie.
+Vec3f colorForType(AcType t)
+{
+	switch (t)
+	{
+		case AcType::Heli:   return Vec3f(1.0f,  0.6f,  0.0f);  // pomarańcz
+		case AcType::Heavy:  return Vec3f(0.8f,  0.53f, 1.0f);  // fiolet
+		case AcType::Small:  return Vec3f(0.53f, 1.0f,  0.73f); // mint
+		case AcType::Glider: return Vec3f(1.0f,  1.0f,  0.67f); // żółty
+		case AcType::Drone:  return Vec3f(1.0f,  0.53f, 0.8f);  // róż
+		case AcType::Jet:
+		default:             return Vec3f(0.0f,  0.67f, 1.0f);  // niebieski
+	}
+}
+
+//! Generuje sylwetkę samolotu (jet — wąskokadłubowy, A320/B737-style) jako QImage.
+//! Path skopiowany 1:1 z aurora-web aircraftIcon.tsx (case 'jet').
+//! Tekstura biała na transparent — kolor finalny ustawiamy przez StelPainter::setColor().
+QImage makeJetIcon(int size)
+{
+	QImage img(size, size, QImage::Format_ARGB32_Premultiplied);
+	img.fill(Qt::transparent);
+
+	QPainter p(&img);
+	p.setRenderHint(QPainter::Antialiasing, true);
+	p.translate(size / 2.0, size / 2.0);
+	const double scale = size / 3.4; // path range ±~1.42 + margin
+	p.scale(scale, scale);
+
+	QPainterPath path;
+	path.moveTo(0, -1.15);
+	path.cubicTo(0.2, -1.15, 0.24, -0.75, 0.24, -0.38);
+	path.lineTo(1.42, 0.32);
+	path.lineTo(0.24, 0.08);
+	path.lineTo(0.24, 0.68);
+	path.lineTo(0.68, 1.08);
+	path.lineTo(0.24, 0.98);
+	path.lineTo(0.15, 1.18);
+	path.lineTo(-0.15, 1.18);
+	path.lineTo(-0.24, 0.98);
+	path.lineTo(-0.68, 1.08);
+	path.lineTo(-0.24, 0.68);
+	path.lineTo(-0.24, 0.08);
+	path.lineTo(-1.42, 0.32);
+	path.lineTo(-0.24, -0.38);
+	path.cubicTo(-0.24, -0.75, -0.2, -1.15, 0, -1.15);
+	path.closeSubpath();
+
+	p.setPen(Qt::NoPen);
+	p.fillPath(path, Qt::white);
+	return img;
+}
+
 //! Konwersja pozycji samolotu (WGS84 lat/lon/alt) → AltAz wzgl. obserwatora.
 //! Port 1:1 z aurora-web src/transit-detector/src/lib/flightVector.ts:49.
 //! ECEF → ENU (East-North-Up), brak korekcji refrakcji (samoloty są blisko, mało istotne).
@@ -125,6 +201,7 @@ AircraftSnapshot parseAc(const QJsonObject& s)
 	a.icao24       = s.value("hex").toString().toLower();
 	a.callsign     = s.value("flight").toString().trimmed();
 	a.aircraftType = s.value("t").toString().trimmed();
+	a.category     = s.value("category").toString().trimmed();
 	a.lat          = s.value("lat").toDouble();
 	a.lon          = s.value("lon").toDouble();
 	a.altM         = s.value("alt_baro").toDouble(0) * 0.3048;       // ft → m
@@ -155,6 +232,10 @@ AuroraAircraft::~AuroraAircraft()
 void AuroraAircraft::init()
 {
 	qDebug() << "[AuroraAircraft] init()";
+
+	// Generuj teksture sylwetki samolotu raz, przy starcie pluginu.
+	const QImage iconImg = makeJetIcon(64);
+	iconTex = StelApp::getInstance().getTextureManager().createTexture(iconImg);
 
 	networkMgr = new QNetworkAccessManager(this);
 	connect(networkMgr, &QNetworkAccessManager::finished,
@@ -306,7 +387,7 @@ void AuroraAircraft::draw(StelCore* core)
 	fontStatus.setBold(true);
 	p2d.setFont(fontStatus);
 
-	const QString l1 = QString("AuroraAircraft v0.0.5 — %1 aircraft (%2 above horizon)")
+	const QString l1 = QString("AuroraAircraft v0.0.6 — %1 aircraft (%2 above horizon)")
 	                   .arg(aircraftCount).arg(aboveHorizonCount);
 	p2d.drawText(40, 80, l1);
 	p2d.drawText(40, 105, lastStatus);
@@ -314,10 +395,14 @@ void AuroraAircraft::draw(StelCore* core)
 	// === 2. Markery samolotow na sferze niebieskiej (AltAz frame) ===
 	const StelProjectorP prj = core->getProjection(StelCore::FrameAltAz);
 	StelPainter pSky(prj);
-	pSky.setColor(0.4f, 0.85f, 1.0f, 0.95f); // jet-blue, jak w naszym webie
 	QFont fontLabel = QGuiApplication::font();
 	fontLabel.setPixelSize(13);
 	pSky.setFont(fontLabel);
+
+	// Tekstura sylwetki + blending — wymagane dla drawSprite2dMode.
+	if (iconTex)
+		iconTex->bind();
+	pSky.setBlending(true, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	for (const AircraftSnapshot& a : aircraft)
 	{
@@ -331,11 +416,37 @@ void AuroraAircraft::draw(StelCore* core)
 		const double lat = a.altDeg * (M_PI / 180.0);
 		StelUtils::spheToRect(lng, lat, pos);
 
-		const QString labelMain = a.callsign.isEmpty() ? a.icao24 : a.callsign;
-		const QString labelType = a.aircraftType.isEmpty() ? "" : QStringLiteral("  ") + a.aircraftType;
+		// Projekcja na ekran. Jeśli punkt nie wpada w viewport — pomiń.
+		Vec3d winPos;
+		if (!prj->project(pos, winPos)) continue;
 
-		// "•" jako marker + callsign + ICAO type. xshift/yshift przesuwa label
-		// obok markera, true = noGravity (label nie obraca sie z polem widzenia).
-		pSky.drawText(pos, QStringLiteral("●  ") + labelMain + labelType, 0, 6, 6, true);
+		const AcType type = classifyAircraft(a);
+		const Vec3f col = colorForType(type);
+
+		// Rozmiar sprite — heavy nieco większy, mały samolot mniejszy.
+		float spriteSize = 14.0f;
+		if (type == AcType::Heavy)  spriteSize = 18.0f;
+		if (type == AcType::Small)  spriteSize = 11.0f;
+		if (type == AcType::Glider) spriteSize = 12.0f;
+		if (type == AcType::Heli)   spriteSize = 12.0f;
+		if (type == AcType::Drone)  spriteSize = 9.0f;
+
+		// Sylwetka: ustaw kolor + rotacja po kursie. Tekstura w QImage jest
+		// rysowana z nosem do góry (-Y w QPainter = top of image), a Stellarium
+		// drawSprite2dMode rotuje od "nos w prawo" CCW. Eksperymentalnie:
+		// rotacja = trueTrackDeg - 90 — żeby track=0 (północ) wskazywał w "górę" ekranu.
+		pSky.setColor(col[0], col[1], col[2], 0.95f);
+		pSky.drawSprite2dMode(static_cast<float>(winPos[0]),
+		                      static_cast<float>(winPos[1]),
+		                      spriteSize,
+		                      static_cast<float>(a.trueTrackDeg - 90.0));
+
+		// Etykieta callsign + ICAO type, obok ikonki (nie używamy noGravity bo
+		// chcemy żeby label szedł z orientacją widoku).
+		const QString labelMain = a.callsign.isEmpty() ? a.icao24 : a.callsign;
+		const QString labelType = a.aircraftType.isEmpty() ? "" : QStringLiteral(" ") + a.aircraftType;
+		pSky.drawText(static_cast<float>(winPos[0]) + spriteSize + 2.0f,
+		              static_cast<float>(winPos[1]) - 4.0f,
+		              labelMain + labelType);
 	}
 }

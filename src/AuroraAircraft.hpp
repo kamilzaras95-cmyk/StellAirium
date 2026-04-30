@@ -10,6 +10,7 @@
 
 #include "StelModule.hpp"
 #include "StelLocation.hpp"
+#include "StelTextureTypes.hpp"
 
 #include <QList>
 #include <QObject>
@@ -28,6 +29,7 @@ struct AircraftSnapshot
 	QString icao24;
 	QString callsign;
 	QString aircraftType;     // ICAO type designator (B738, A320, C152…)
+	QString category;         // ADS-B emitter category (A1–A7, B1–B6…)
 
 	// Snapshot z fetchu:
 	double  lat;              // stopnie
@@ -83,6 +85,9 @@ private:
 
 	//! Aktualna lista samolotów po ostatnim fetchu — z policzonym AltAz.
 	QList<AircraftSnapshot> aircraft;
+
+	//! Tekstura sylwetki samolotu, generowana w init() przez QPainter.
+	StelTextureSP iconTex;
 };
 
 
