@@ -131,6 +131,17 @@ AircraftSnapshot parseAc(const QJsonObject& s)
 	a.speedMs      = s.value("gs").toDouble(0) * 0.514444;            // kt → m/s
 	a.trueTrackDeg = s.value("track").toDouble(0);
 	a.seenPosSec   = s.value("seen_pos").toDouble(0);
+
+	// vert_rate/baro_rate/geom_rate — fpm na m/s. Bierzemy pierwsze niezerowe.
+	double vrFpm = s.value("vert_rate").toDouble(0);
+	if (vrFpm == 0) vrFpm = s.value("baro_rate").toDouble(0);
+	if (vrFpm == 0) vrFpm = s.value("geom_rate").toDouble(0);
+	a.verticalRateMs = vrFpm * 0.00508; // fpm → m/s
+
+	// Inicjalizacja current = snapshot. Propagacja w update().
+	a.currentLat  = a.lat;
+	a.currentLon  = a.lon;
+	a.currentAltM = a.altM;
 	a.altDeg = a.azDeg = 0;
 	return a;
 }
@@ -163,7 +174,36 @@ void AuroraAircraft::init()
 
 void AuroraAircraft::update(double deltaTime)
 {
-	Q_UNUSED(deltaTime)
+	if (aircraft.isEmpty() || deltaTime <= 0) return;
+
+	// Pozycja obserwatora ze Stellarium (uaktualniana per-klatkę,
+	// żeby przy zmianie lokalizacji F6 reagować od razu).
+	StelCore* core = StelApp::getInstance().getCore();
+	const StelLocation& loc = core->getCurrentLocation();
+	const double obsLat = loc.getLatitude();
+	const double obsLon = loc.getLongitude();
+	const double obsAltM = loc.altitude;
+
+	int newAboveHorizon = 0;
+	for (AircraftSnapshot& a : aircraft)
+	{
+		// Dead-reckoning: propaguj currentLat/Lon o deltaTime sekund
+		// po wektorze prędkości. Port z aurora-web flightVector.ts:25 (propagatePosition).
+		const double trackRad = a.trueTrackDeg * (M_PI / 180.0);
+		const double distM = a.speedMs * deltaTime;
+		const double cosLat = std::cos(a.currentLat * (M_PI / 180.0));
+		a.currentLat += (std::cos(trackRad) * distM) / 111320.0;
+		if (cosLat > 1e-9)
+			a.currentLon += (std::sin(trackRad) * distM) / (111320.0 * cosLat);
+		a.currentAltM += a.verticalRateMs * deltaTime;
+
+		// Re-oblicz AltAz dla nowej pozycji.
+		toAltAz(a.currentLat, a.currentLon, a.currentAltM,
+		        obsLat, obsLon, obsAltM,
+		        a.altDeg, a.azDeg);
+		if (a.altDeg > 0) ++newAboveHorizon;
+	}
+	aboveHorizonCount = newAboveHorizon;
 }
 
 double AuroraAircraft::getCallOrder(StelModuleActionName actionName) const
@@ -233,7 +273,8 @@ void AuroraAircraft::onReply(QNetworkReply* reply)
 	{
 		AircraftSnapshot a = parseAc(v.toObject());
 		if (a.icao24.isEmpty()) continue;
-		toAltAz(a.lat, a.lon, a.altM, obsLat, obsLon, obsAltM, a.altDeg, a.azDeg);
+		toAltAz(a.currentLat, a.currentLon, a.currentAltM,
+		        obsLat, obsLon, obsAltM, a.altDeg, a.azDeg);
 		if (a.altDeg > 0) ++aboveHorizonCount;
 		aircraft.append(a);
 	}
@@ -265,7 +306,7 @@ void AuroraAircraft::draw(StelCore* core)
 	fontStatus.setBold(true);
 	p2d.setFont(fontStatus);
 
-	const QString l1 = QString("AuroraAircraft v0.0.4 — %1 aircraft (%2 above horizon)")
+	const QString l1 = QString("AuroraAircraft v0.0.5 — %1 aircraft (%2 above horizon)")
 	                   .arg(aircraftCount).arg(aboveHorizonCount);
 	p2d.drawText(40, 80, l1);
 	p2d.drawText(40, 105, lastStatus);

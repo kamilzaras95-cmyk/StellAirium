@@ -21,20 +21,31 @@ class QNetworkReply;
 class QTimer;
 
 //! Pojedyncza migawka samolotu — to co przetrwa parse z adsb.fi.
+//! `lat/lon/altM` to pozycja z fetchu (snapshot). `currentLat/Lon/AltM`
+//! to pozycja propagowana co klatkę w update() — to ona idzie do toAltAz().
 struct AircraftSnapshot
 {
 	QString icao24;
 	QString callsign;
-	QString aircraftType;  // ICAO type designator (B738, A320, C152…)
-	double  lat;           // stopnie
-	double  lon;           // stopnie
-	double  altM;          // metry n.p.m. (barometric)
-	double  speedMs;       // m/s
-	double  trueTrackDeg;  // 0–360°, 0=N, rośnie CW
-	double  seenPosSec;    // ile sekund temu była ostatnia pozycja (od data.now)
-	// Wyliczone na froncie po parsie:
-	double  altDeg;        // elewacja względem obserwatora w Stellarium
-	double  azDeg;         // azymut [0–360°)
+	QString aircraftType;     // ICAO type designator (B738, A320, C152…)
+
+	// Snapshot z fetchu:
+	double  lat;              // stopnie
+	double  lon;              // stopnie
+	double  altM;             // metry n.p.m. (barometric)
+	double  speedMs;          // m/s (gs)
+	double  trueTrackDeg;     // 0–360°, 0=N, rośnie CW
+	double  verticalRateMs;   // m/s, +up
+	double  seenPosSec;       // ile sekund temu była ostatnia pozycja (od data.now)
+
+	// Dead-reckoning state — propagowane co klatkę w update(deltaTime):
+	double  currentLat;
+	double  currentLon;
+	double  currentAltM;
+
+	// Wyliczone AltAz względem obserwatora (recompute co klatkę):
+	double  altDeg;           // elewacja
+	double  azDeg;            // azymut [0–360°)
 };
 
 //! Główna klasa pluginu — fetch ADS-B z adsb.fi co 15s, parse, render w draw().
