@@ -9,13 +9,35 @@
 #define AURORAAIRCRAFT_HPP
 
 #include "StelModule.hpp"
+#include "StelLocation.hpp"
+
+#include <QList>
 #include <QObject>
+#include <QString>
 
 class StelCore;
+class QNetworkAccessManager;
+class QNetworkReply;
+class QTimer;
 
-//! Główna klasa pluginu — od razu rysuje napis na ekranie, żeby zweryfikować
-//! że plugin się ładuje. W kolejnych iteracjach: fetcher ADS-B, transform AltAz,
-//! render ikon samolotów, click-to-detail.
+//! Pojedyncza migawka samolotu — to co przetrwa parse z adsb.fi.
+struct AircraftSnapshot
+{
+	QString icao24;
+	QString callsign;
+	QString aircraftType;  // ICAO type designator (B738, A320, C152…)
+	double  lat;           // stopnie
+	double  lon;           // stopnie
+	double  altM;          // metry n.p.m. (barometric)
+	double  speedMs;       // m/s
+	double  trueTrackDeg;  // 0–360°, 0=N, rośnie CW
+	double  seenPosSec;    // ile sekund temu była ostatnia pozycja (od data.now)
+	// Wyliczone na froncie po parsie:
+	double  altDeg;        // elewacja względem obserwatora w Stellarium
+	double  azDeg;         // azymut [0–360°)
+};
+
+//! Główna klasa pluginu — fetch ADS-B z adsb.fi co 15s, parse, render w draw().
 class AuroraAircraft : public StelModule
 {
 	Q_OBJECT
@@ -24,18 +46,37 @@ public:
 	~AuroraAircraft() override;
 
 	void init() override;
+	void update(double deltaTime) override;
 	void draw(StelCore* core) override;
 	double getCallOrder(StelModuleActionName actionName) const override;
 
+private slots:
+	//! Triggerowane przez QTimer co 15s — robi GET na /api/v2/lat/lon/dist.
+	void fetchAircraft();
+	//! Odpowiedź z adsb.fi — parsuje JSON, aktualizuje aircraftCount + lastStatus.
+	void onReply(QNetworkReply* reply);
+	//! Stellarium zmienił lokalizację (user kliknął F6) — od razu fetch.
+	void onLocationChanged(const StelLocation& loc);
+
 private:
-	int fontSize;
+	QNetworkAccessManager* networkMgr;
+	QTimer* fetchTimer;
+
+	//! Promień zapytania w nm. 250 ≈ ~460 km — pokrywa horyzont z dużym zapasem.
+	int distNm;
+
+	//! Status do wyświetlenia w draw() — zmienia się gdy fetch wraca.
+	QString lastStatus;
+	int aircraftCount;
+	int aboveHorizonCount;
+
+	//! Aktualna lista samolotów po ostatnim fetchu — z policzonym AltAz.
+	QList<AircraftSnapshot> aircraft;
 };
 
 
 #include "StelPluginInterface.hpp"
 
-//! Qt boilerplate — Stellarium używa QPluginLoader żeby załadować bibliotekę,
-//! a ten interfejs pozwala mu wciąć getStelModule()/getPluginInfo().
 class AuroraAircraftStelPluginInterface : public QObject, public StelPluginInterface
 {
 	Q_OBJECT

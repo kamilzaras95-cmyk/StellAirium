@@ -16,6 +16,7 @@ ADD_LIBRARY(AuroraAircraft-static STATIC ${AuroraAircraft_SRCS})
 TARGET_LINK_LIBRARIES(AuroraAircraft-static
      Qt${QT_VERSION_MAJOR}::Core
      Qt${QT_VERSION_MAJOR}::Gui
+     Qt${QT_VERSION_MAJOR}::Network
 )
 
 SET_TARGET_PROPERTIES(AuroraAircraft-static PROPERTIES OUTPUT_NAME "AuroraAircraft")
