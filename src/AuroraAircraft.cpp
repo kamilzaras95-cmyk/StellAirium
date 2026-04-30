@@ -390,18 +390,17 @@ void AuroraAircraft::onLocationChanged(const StelLocation& loc)
 
 void AuroraAircraft::draw(StelCore* core)
 {
-	// === 1. Status (2D, lewy gorny rog) ===
+	// === 1. Subtelny status w prawym dolnym rogu — niech nie zasłania nieba ===
 	StelPainter p2d(core->getProjection2d());
-	p2d.setColor(0.4f, 1.0f, 0.6f, 1.0f);
+	p2d.setColor(0.4f, 0.85f, 1.0f, 0.55f); // niebieski, pół-przezroczysty
 	QFont fontStatus = QGuiApplication::font();
-	fontStatus.setPixelSize(16);
-	fontStatus.setBold(true);
+	fontStatus.setPixelSize(11);
 	p2d.setFont(fontStatus);
 
-	const QString l1 = QString("AuroraAircraft v0.0.7 — %1 aircraft (%2 above horizon)")
-	                   .arg(aircraftCount).arg(aboveHorizonCount);
-	p2d.drawText(40, 80, l1);
-	p2d.drawText(40, 105, lastStatus);
+	const float vw = static_cast<float>(p2d.getProjector()->getViewportWidth());
+	const QString badge = QString("✈ Aurora Aircraft — %1 aloft / %2 in radius")
+	                      .arg(aboveHorizonCount).arg(aircraftCount);
+	p2d.drawText(vw - 280.0f, 18.0f, badge);
 
 	// === 2. Markery samolotow na sferze niebieskiej (AltAz frame) ===
 	const StelProjectorP prj = core->getProjection(StelCore::FrameAltAz);
@@ -483,29 +482,19 @@ QList<StelObjectP> AuroraAircraft::searchAround(const Vec3d& v, double limitFov,
 	Vec3d vAltAz = core->j2000ToAltAz(v, StelCore::RefractionOff);
 	vAltAz.normalize();
 
-	int aboveHorizon = 0;
-	double bestDot = -1.0;
 	for (const AircraftObjectP& obj : aircraft)
 	{
 		const AircraftSnapshot& a = obj->snap;
 		if (a.altDeg <= 0) continue;
-		++aboveHorizon;
 
 		Vec3d altAzVec;
 		const double lng = (180.0 - a.azDeg) * (M_PI / 180.0);
 		const double lat = a.altDeg * (M_PI / 180.0);
 		StelUtils::spheToRect(lng, lat, altAzVec);
 
-		const double d = vAltAz.dot(altAzVec);
-		if (d > bestDot) bestDot = d;
-		if (d >= cosLimitFov)
+		if (vAltAz.dot(altAzVec) >= cosLimitFov)
 			result.append(qSharedPointerCast<StelObject>(obj));
 	}
-	qDebug() << "[AuroraAircraft] searchAround: limitFov=" << limitFov
-	         << "deg, cosThreshold=" << cosLimitFov
-	         << ", aboveHorizon=" << aboveHorizon
-	         << ", bestDot=" << bestDot
-	         << ", matched=" << result.size();
 	return result;
 }
 

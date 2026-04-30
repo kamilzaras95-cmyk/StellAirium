@@ -36,16 +36,11 @@ Vec3d AircraftObject::getJ2000EquatorialPos(const StelCore* core) const
 	const double lng = (180.0 - snap.azDeg) * (M_PI / 180.0);
 	const double lat = snap.altDeg * (M_PI / 180.0);
 	StelUtils::spheToRect(lng, lat, altAzVec);
-	const Vec3d j2000 = core->altAzToJ2000(altAzVec, StelCore::RefractionOff);
-	qDebug() << "[AircraftObject]" << snap.icao24 << "getJ2000EquatorialPos: alt="
-	         << snap.altDeg << "az=" << snap.azDeg
-	         << "→ J2000=" << j2000[0] << j2000[1] << j2000[2];
-	return j2000;
+	return core->altAzToJ2000(altAzVec, StelCore::RefractionOff);
 }
 
 QString AircraftObject::getInfoString(const StelCore* core, const InfoStringGroup& flags) const
 {
-	qDebug() << "[AircraftObject]" << snap.icao24 << "getInfoString called, flags=" << static_cast<int>(flags);
 	QString str;
 	QTextStream s(&str, QIODevice::WriteOnly);
 
