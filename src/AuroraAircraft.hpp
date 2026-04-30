@@ -8,18 +8,21 @@
 #ifndef AURORAAIRCRAFT_HPP
 #define AURORAAIRCRAFT_HPP
 
-#include "StelModule.hpp"
+#include "StelObjectModule.hpp"
 #include "StelLocation.hpp"
 #include "StelTextureTypes.hpp"
 
 #include <QList>
 #include <QObject>
+#include <QSharedPointer>
 #include <QString>
 
 class StelCore;
 class QNetworkAccessManager;
 class QNetworkReply;
 class QTimer;
+class AircraftObject;
+typedef QSharedPointer<AircraftObject> AircraftObjectP;
 
 //! Pojedyncza migawka samolotu — to co przetrwa parse z adsb.fi.
 //! `lat/lon/altM` to pozycja z fetchu (snapshot). `currentLat/Lon/AltM`
@@ -51,17 +54,29 @@ struct AircraftSnapshot
 };
 
 //! Główna klasa pluginu — fetch ADS-B z adsb.fi co 15s, parse, render w draw().
-class AuroraAircraft : public StelModule
+//! Dziedziczymy po StelObjectModule (a nie StelModule) żeby Stellarium mogło
+//! traktować samoloty jako selectable objecty (klik → info-panel).
+class AuroraAircraft : public StelObjectModule
 {
 	Q_OBJECT
 public:
 	AuroraAircraft();
 	~AuroraAircraft() override;
 
+	// === StelModule API ===
 	void init() override;
 	void update(double deltaTime) override;
 	void draw(StelCore* core) override;
 	double getCallOrder(StelModuleActionName actionName) const override;
+
+	// === StelObjectModule API ===
+	QList<StelObjectP> searchAround(const Vec3d& v, double limitFov, const StelCore* core) const override;
+	StelObjectP searchByNameI18n(const QString& nameI18n) const override;
+	StelObjectP searchByName(const QString& name) const override;
+	StelObjectP searchByID(const QString& id) const override;
+	QVector<QPair<QString, StelObjectP>> listAllObjects(bool inEnglish) const override;
+	QString getName() const override { return "Aircraft"; }
+	QString getStelObjectType() const override { return "AuroraAircraft"; }
 
 private slots:
 	//! Triggerowane przez QTimer co 15s — robi GET na /api/v2/lat/lon/dist.
@@ -83,8 +98,8 @@ private:
 	int aircraftCount;
 	int aboveHorizonCount;
 
-	//! Aktualna lista samolotów po ostatnim fetchu — z policzonym AltAz.
-	QList<AircraftSnapshot> aircraft;
+	//! Aktualna lista samolotów po ostatnim fetchu — każdy jako StelObject.
+	QList<AircraftObjectP> aircraft;
 
 	//! Tekstura sylwetki samolotu, generowana w init() przez QPainter.
 	StelTextureSP iconTex;

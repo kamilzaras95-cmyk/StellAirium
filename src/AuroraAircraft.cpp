@@ -6,10 +6,12 @@
  */
 
 #include "AuroraAircraft.hpp"
+#include "AircraftObject.hpp"
 
 #include "StelApp.hpp"
 #include "StelCore.hpp"
 #include "StelModuleMgr.hpp"
+#include "StelObjectMgr.hpp"
 #include "StelPainter.hpp"
 #include "StelProjector.hpp"
 #include "StelTexture.hpp"
@@ -237,6 +239,10 @@ void AuroraAircraft::init()
 	const QImage iconImg = makeJetIcon(64);
 	iconTex = StelApp::getInstance().getTextureManager().createTexture(iconImg);
 
+	// Rejestracja jako provider StelObject — dzięki temu Stellarium wie,
+	// że nasze samoloty są klikalne i potrafi pokazać info-panel po lewej.
+	GETSTELMODULE(StelObjectMgr)->registerStelObjectMgr(this);
+
 	networkMgr = new QNetworkAccessManager(this);
 	connect(networkMgr, &QNetworkAccessManager::finished,
 	        this, &AuroraAircraft::onReply);
@@ -266,8 +272,10 @@ void AuroraAircraft::update(double deltaTime)
 	const double obsAltM = loc.altitude;
 
 	int newAboveHorizon = 0;
-	for (AircraftSnapshot& a : aircraft)
+	for (AircraftObjectP& obj : aircraft)
 	{
+		AircraftSnapshot& a = obj->snap;
+
 		// Dead-reckoning: propaguj currentLat/Lon o deltaTime sekund
 		// po wektorze prędkości. Port z aurora-web flightVector.ts:25 (propagatePosition).
 		const double trackRad = a.trueTrackDeg * (M_PI / 180.0);
@@ -357,7 +365,10 @@ void AuroraAircraft::onReply(QNetworkReply* reply)
 		toAltAz(a.currentLat, a.currentLon, a.currentAltM,
 		        obsLat, obsLon, obsAltM, a.altDeg, a.azDeg);
 		if (a.altDeg > 0) ++aboveHorizonCount;
-		aircraft.append(a);
+
+		AircraftObjectP obj(new AircraftObject());
+		obj->snap = a;
+		aircraft.append(obj);
 	}
 
 	const double serverNow = root.value("now").toDouble(0);
@@ -387,7 +398,7 @@ void AuroraAircraft::draw(StelCore* core)
 	fontStatus.setBold(true);
 	p2d.setFont(fontStatus);
 
-	const QString l1 = QString("AuroraAircraft v0.0.6 — %1 aircraft (%2 above horizon)")
+	const QString l1 = QString("AuroraAircraft v0.0.7 — %1 aircraft (%2 above horizon)")
 	                   .arg(aircraftCount).arg(aboveHorizonCount);
 	p2d.drawText(40, 80, l1);
 	p2d.drawText(40, 105, lastStatus);
@@ -404,8 +415,9 @@ void AuroraAircraft::draw(StelCore* core)
 		iconTex->bind();
 	pSky.setBlending(true, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	for (const AircraftSnapshot& a : aircraft)
+	for (const AircraftObjectP& obj : aircraft)
 	{
+		const AircraftSnapshot& a = obj->snap;
 		if (a.altDeg <= 0) continue; // pod horyzontem — nie ma sensu
 
 		// Stellarium FrameAltAz: +x=south, +y=east, +z=zenith.
@@ -449,4 +461,87 @@ void AuroraAircraft::draw(StelCore* core)
 		              static_cast<float>(winPos[1]) - 4.0f,
 		              labelMain + labelType);
 	}
+}
+
+
+//
+// === StelObjectModule API — żeby Stellarium mogło klikać samoloty ===
+//
+
+QList<StelObjectP> AuroraAircraft::searchAround(const Vec3d& v, double limitFov,
+                                                const StelCore* core) const
+{
+	QList<StelObjectP> result;
+	if (aircraft.isEmpty()) return result;
+
+	const double cosLimitFov = std::cos(limitFov * (M_PI / 180.0));
+
+	// Ważne: render używa core->getProjection(FrameAltAz). Hit-test dostaje `v`
+	// w J2000. Żeby porównać w tym samym frame'ie co rysuje, konwertuję klik
+	// J2000 → AltAz przez Stellarium-native j2000ToAltAz, i tu liczę dot product
+	// z wektorem altAz konstruowanym lokalnie z (alt, az).
+	Vec3d vAltAz = core->j2000ToAltAz(v, StelCore::RefractionOff);
+	vAltAz.normalize();
+
+	int aboveHorizon = 0;
+	double bestDot = -1.0;
+	for (const AircraftObjectP& obj : aircraft)
+	{
+		const AircraftSnapshot& a = obj->snap;
+		if (a.altDeg <= 0) continue;
+		++aboveHorizon;
+
+		Vec3d altAzVec;
+		const double lng = (180.0 - a.azDeg) * (M_PI / 180.0);
+		const double lat = a.altDeg * (M_PI / 180.0);
+		StelUtils::spheToRect(lng, lat, altAzVec);
+
+		const double d = vAltAz.dot(altAzVec);
+		if (d > bestDot) bestDot = d;
+		if (d >= cosLimitFov)
+			result.append(qSharedPointerCast<StelObject>(obj));
+	}
+	qDebug() << "[AuroraAircraft] searchAround: limitFov=" << limitFov
+	         << "deg, cosThreshold=" << cosLimitFov
+	         << ", aboveHorizon=" << aboveHorizon
+	         << ", bestDot=" << bestDot
+	         << ", matched=" << result.size();
+	return result;
+}
+
+StelObjectP AuroraAircraft::searchByNameI18n(const QString& nameI18n) const
+{
+	return searchByName(nameI18n);
+}
+
+StelObjectP AuroraAircraft::searchByName(const QString& name) const
+{
+	const QString needle = name.trimmed().toUpper();
+	for (const AircraftObjectP& obj : aircraft)
+	{
+		if (obj->getEnglishName().toUpper() == needle ||
+		    obj->snap.icao24.toUpper() == needle)
+			return qSharedPointerCast<StelObject>(obj);
+	}
+	return StelObjectP();
+}
+
+StelObjectP AuroraAircraft::searchByID(const QString& id) const
+{
+	for (const AircraftObjectP& obj : aircraft)
+	{
+		if (obj->snap.icao24 == id.toLower())
+			return qSharedPointerCast<StelObject>(obj);
+	}
+	return StelObjectP();
+}
+
+QVector<QPair<QString, StelObjectP>> AuroraAircraft::listAllObjects(bool inEnglish) const
+{
+	Q_UNUSED(inEnglish)
+	QVector<QPair<QString, StelObjectP>> result;
+	result.reserve(aircraft.size());
+	for (const AircraftObjectP& obj : aircraft)
+		result.append({obj->getEnglishName(), qSharedPointerCast<StelObject>(obj)});
+	return result;
 }

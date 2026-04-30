@@ -9,6 +9,8 @@ LINK_DIRECTORIES(${CMAKE_BINARY_DIR}/src)
 SET(AuroraAircraft_SRCS
      AuroraAircraft.hpp
      AuroraAircraft.cpp
+     AircraftObject.hpp
+     AircraftObject.cpp
 )
 
 ADD_LIBRARY(AuroraAircraft-static STATIC ${AuroraAircraft_SRCS})
