@@ -20,7 +20,7 @@ jobs:
         with:
           version: '6.9.*'
           arch: 'clang_64'
-          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebchannel qtwebview'
+          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebengine qtwebchannel qtwebview'
           cache: true
 
       - name: Install CMake
