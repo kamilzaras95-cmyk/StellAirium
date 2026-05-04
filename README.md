@@ -16,7 +16,7 @@ Dane ADS-B pobierane bezpośrednio od publicznych providerów (adsb.fi, airplane
 
 ### macOS
 
-1. Pobierz `StellAirium-macOS-arm64.zip` z [Releases](../../releases/latest)
+1. Pobierz `StellAirium-Stellarium26.1-macOS-arm64.zip` z [Releases](../../releases/latest)
 2. Wypakuj i skopiuj do katalogu pluginów Stellarium:
 
 ```bash
@@ -31,7 +31,7 @@ codesign --sign - --force --timestamp=none \
 
 ### Windows
 
-1. Pobierz `StellAirium-Windows-x64.zip` z [Releases](../../releases/latest)
+1. Pobierz `StellAirium-Stellarium26.1-Windows-x64.zip` z [Releases](../../releases/latest)
 2. Wypakuj i skopiuj do katalogu pluginów Stellarium:
 
 ```
@@ -42,7 +42,7 @@ codesign --sign - --force --timestamp=none \
 
 ## Wymagania
 
-- Stellarium 0.21.0 lub nowszy
+- Stellarium 26.1 Qt6
 - Połączenie z internetem (dane ADS-B)
 
 ## Licencja

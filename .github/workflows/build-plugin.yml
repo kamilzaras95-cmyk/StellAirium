@@ -5,6 +5,11 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+env:
+  STELLARIUM_TAG: v26.1
+  QT_VERSION_WINDOWS: 6.9.3
+  QT_VERSION_MACOS: 6.9.3
+
 jobs:
   # ── macOS arm64 ────────────────────────────────────────────────────────────
   build-macos:
@@ -18,7 +23,7 @@ jobs:
       - name: Install Qt 6.9 (musi pasować do Qt w Stellarium.app)
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.9.*'
+          version: ${{ env.QT_VERSION_MACOS }}
           arch: 'clang_64'
           modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebengine qtwebchannel qtwebview'
           cache: true
@@ -27,7 +32,7 @@ jobs:
         uses: lukka/get-cmake@latest
 
       - name: Clone Stellarium source
-        run: git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
+        run: git clone --depth 1 --branch "${{ env.STELLARIUM_TAG }}" https://github.com/Stellarium/stellarium.git stellarium-src
 
       - name: Link plugin into Stellarium tree
         run: |
@@ -54,7 +59,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StellAirium-macOS-arm64
+          name: StellAirium-Stellarium26.1-macOS-arm64
           path: dist/
 
   # ── Windows x64 ───────────────────────────────────────────────────────────
@@ -69,7 +74,7 @@ jobs:
       - name: Install Qt 6.9 (musi pasować do Qt w Stellarium.app)
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.9.*'
+          version: ${{ env.QT_VERSION_WINDOWS }}
           arch: 'win64_msvc2022_64'
           modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebengine qtwebchannel qtwebview'
           cache: true
@@ -78,7 +83,7 @@ jobs:
         uses: lukka/get-cmake@latest
 
       - name: Clone Stellarium source
-        run: git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
+        run: git clone --depth 1 --branch "${{ env.STELLARIUM_TAG }}" https://github.com/Stellarium/stellarium.git stellarium-src
 
       - name: Link plugin into Stellarium tree
         shell: pwsh
@@ -109,7 +114,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StellAirium-Windows-x64
+          name: StellAirium-Stellarium26.1-Windows-x64
           path: dist/
 
   # ── GitHub Release ─────────────────────────────────────────────────────────
@@ -125,13 +130,13 @@ jobs:
 
       - name: Zip artifacts
         run: |
-          zip -r StellAirium-macOS-arm64.zip StellAirium-macOS-arm64/
-          zip -r StellAirium-Windows-x64.zip StellAirium-Windows-x64/
+          zip -r StellAirium-Stellarium26.1-macOS-arm64.zip StellAirium-Stellarium26.1-macOS-arm64/
+          zip -r StellAirium-Stellarium26.1-Windows-x64.zip StellAirium-Stellarium26.1-Windows-x64/
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            StellAirium-macOS-arm64.zip
-            StellAirium-Windows-x64.zip
+            StellAirium-Stellarium26.1-macOS-arm64.zip
+            StellAirium-Stellarium26.1-Windows-x64.zip
           generate_release_notes: true
