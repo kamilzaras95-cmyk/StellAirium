@@ -5,6 +5,10 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 env:
   STELLARIUM_TAG: v26.1
   QT_VERSION_WINDOWS: 6.9.3
