@@ -19,12 +19,12 @@ jobs:
         run: brew install qt cmake
 
       - name: Clone Stellarium source
-        run: |
-          git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
+        run: git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
 
       - name: Link plugin into Stellarium tree
         run: |
           ln -sf "$GITHUB_WORKSPACE/plugin" stellarium-src/plugins/StellAirium
+          echo 'ADD_SUBDIRECTORY(StellAirium)' >> stellarium-src/plugins/CMakeLists.txt
 
       - name: CMake configure
         run: |
@@ -36,8 +36,7 @@ jobs:
             -DENABLE_TESTING=OFF
 
       - name: Build StellAirium module
-        run: |
-          cmake --build stellarium-src/build --target StellAirium -j$(sysctl -n hw.logicalcpu)
+        run: cmake --build stellarium-src/build --target StellAirium -j$(sysctl -n hw.logicalcpu)
 
       - name: Package
         run: |
@@ -65,20 +64,22 @@ jobs:
         with:
           version: '6.7.*'
           arch: 'win64_msvc2019_64'
-          modules: 'qtwebengine qtwebview'
+          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebengine qtwebchannel qtwebview'
+          cache: true
 
       - name: Install CMake
         uses: lukka/get-cmake@latest
 
       - name: Clone Stellarium source
-        run: |
-          git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
+        run: git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
 
       - name: Link plugin into Stellarium tree
+        shell: pwsh
         run: |
           New-Item -ItemType Junction `
             -Path "$env:GITHUB_WORKSPACE\stellarium-src\plugins\StellAirium" `
             -Target "$env:GITHUB_WORKSPACE\plugin"
+          Add-Content stellarium-src\plugins\CMakeLists.txt "`nADD_SUBDIRECTORY(StellAirium)"
 
       - name: CMake configure
         run: |
@@ -89,15 +90,14 @@ jobs:
             -DENABLE_TESTING=OFF
 
       - name: Build StellAirium module
-        run: |
-          cmake --build stellarium-src/build --target StellAirium `
-            --config Release -j $env:NUMBER_OF_PROCESSORS
+        run: cmake --build stellarium-src/build --target StellAirium --config Release -j $env:NUMBER_OF_PROCESSORS
 
       - name: Package
+        shell: pwsh
         run: |
-          mkdir dist\StellAirium
-          copy stellarium-src\build\modules\StellAirium\Release\StellAirium.dll dist\StellAirium\
-          copy plugin\module.ini dist\StellAirium\
+          New-Item -ItemType Directory -Path dist\StellAirium -Force
+          Copy-Item stellarium-src\build\modules\StellAirium\Release\StellAirium.dll dist\StellAirium\
+          Copy-Item plugin\module.ini dist\StellAirium\
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -105,7 +105,7 @@ jobs:
           name: StellAirium-Windows-x64
           path: dist/
 
-  # ── GitHub Release — tworzy release z obu plików przy tagu v* ─────────────
+  # ── GitHub Release ─────────────────────────────────────────────────────────
   release:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
