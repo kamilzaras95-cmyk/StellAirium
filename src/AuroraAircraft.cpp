@@ -55,7 +55,7 @@ StelPluginInfo AuroraAircraftStelPluginInterface::getPluginInfo() const
 	info.contact         = "https://astronow.pl";
 	info.description     = "Pokazuje samoloty na żywo na sferze niebieskiej "
 	                       "na podstawie danych ADS-B (adsb.fi).";
-	info.version         = "0.0.2";
+	info.version         = AURORAAIRCRAFT_PLUGIN_VERSION;
 	info.license         = "GPL v2 or later";
 	return info;
 }
@@ -77,6 +77,8 @@ AuroraAircraft::AuroraAircraft()
 	, lastStatus("waiting for first fetch...")
 	, aircraftCount(0)
 	, aboveHorizonCount(0)
+	, latestRequestId(0)
+	, inFlightReply(nullptr)
 	, configDialog(nullptr)
 {
 	setObjectName("AuroraAircraft");
@@ -335,6 +337,7 @@ double AuroraAircraft::getCallOrder(StelModuleActionName actionName) const
 
 void AuroraAircraft::fetchAircraft()
 {
+	const qint64 requestId = ++latestRequestId;
 	const StelLocation& loc = StelApp::getInstance().getCore()->getCurrentLocation();
 	const double lat = loc.getLatitude();
 	const double lon = loc.getLongitude();
@@ -346,19 +349,40 @@ void AuroraAircraft::fetchAircraft()
 
 	qDebug() << "[AuroraAircraft] fetch" << urlStr;
 
+	if (inFlightReply)
+		inFlightReply->abort();
+
 	QNetworkRequest req((QUrl(urlStr)));
 	req.setRawHeader("User-Agent",
-	                 "AuroraAircraft-Stellarium-Plugin/0.0.2 (+https://astronow.pl)");
+	                 "AuroraAircraft-Stellarium-Plugin/" AURORAAIRCRAFT_PLUGIN_VERSION " (+https://astronow.pl)");
 	req.setRawHeader("Accept", "application/json");
-	networkMgr->get(req);
+	inFlightReply = networkMgr->get(req);
+	inFlightReply->setProperty("requestId", requestId);
 }
 
 void AuroraAircraft::onReply(QNetworkReply* reply)
 {
+	const qint64 requestId = reply->property("requestId").toLongLong();
+	const bool isLatestReply = (requestId == latestRequestId);
+	if (reply == inFlightReply)
+		inFlightReply = nullptr;
+
 	reply->deleteLater();
+
+	if (!isLatestReply)
+	{
+		qDebug() << "[AuroraAircraft] ignoring stale reply" << requestId
+		         << "(latest is" << latestRequestId << ")";
+		return;
+	}
 
 	if (reply->error() != QNetworkReply::NoError)
 	{
+		if (reply->error() == QNetworkReply::OperationCanceledError)
+		{
+			lastStatus = "fetch canceled";
+			return;
+		}
 		lastStatus = QString("error: %1").arg(reply->errorString());
 		qWarning() << "[AuroraAircraft] fetch failed:" << reply->errorString();
 		return;

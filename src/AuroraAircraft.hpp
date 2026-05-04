@@ -14,6 +14,7 @@
 
 #include <QList>
 #include <QObject>
+#include <QPointer>
 #include <QSettings>
 #include <QSharedPointer>
 #include <QString>
@@ -107,6 +108,8 @@ private:
 	QString lastStatus;
 	int aircraftCount;
 	int aboveHorizonCount;
+	qint64 latestRequestId;
+	QPointer<QNetworkReply> inFlightReply;
 
 	//! Aktualna lista samolotów po ostatnim fetchu — każdy jako StelObject.
 	QList<AircraftObjectP> aircraft;
