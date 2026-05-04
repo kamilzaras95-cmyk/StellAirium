@@ -19,7 +19,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.9.*'
-          arch: 'clang_arm64'
+          arch: 'clang_64'
           cache: true
 
       - name: Install CMake
@@ -69,7 +69,7 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.9.*'
-          arch: 'win64_msvc2019_64'
+          arch: 'win64_msvc2022_64'
           modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebengine qtwebchannel qtwebview'
           cache: true
 
