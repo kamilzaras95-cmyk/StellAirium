@@ -1,53 +1,54 @@
-# aurora-stellarium-aircraft
+# StellAirium
 
 Stellarium plugin pokazujący samoloty na żywo na sferze niebieskiej.
-Side-loadowy plugin — bez weryfikacji w oficjalnym plugin manager Stellarium.
 
-## Status
+Dane ADS-B pobierane bezpośrednio od publicznych providerów (adsb.fi, airplanes.live) — bez pośrednika.
 
-MVP — w trakcie projektowania.
+## Funkcje
 
-## Architektura w skrócie
+- Sylwetki samolotów na mapie nieba, obracane zgodnie z kursem
+- Kolory per typ (odrzutowiec, śmigłowiec, lekki, cargo…)
+- Dead-reckoning między kolejnymi fetchami — płynny ruch
+- Kliknięcie → panel ze szczegółami (callsign, ICAO type, altitude, speed, squawk…)
+- Konfigurowalny zasięg (50–500 nm), źródło danych i interwał odświeżania
 
-- C++/Qt plugin ładowany przez Stellarium ze ścieżki `~/.stellarium/modules/AuroraAircraft/`
-- Fetch ADS-B z `https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/{dist}` co 2 s (z IP użytkownika, nie przez astronow.pl)
-- Konwersja lat/lon/alt → AltAz przez `StelCore` Stellarium
-- Render: ikonki + etykiety (callsign + ICAO type), klik dla szczegółów
-- Dead-reckoning klatka po klatce (Stellarium update tick) między próbkami fetchu
+## Instalacja
 
-## Roadmap
+### macOS
 
-- [ ] Toolchain: Qt 6 + Stellarium source (SDK headers)
-- [ ] Skeleton plugin (loads, pojawia się w "Configuration → Plugins")
-- [ ] Background QTimer fetcher → adsb.fi → parsed `AircraftSnapshot`
-- [ ] Coord transform via `StelCore::altAzToJ2000` (lub odwrotnie)
-- [ ] Renderer: `StelPainter` z prostymi markerami
-- [ ] GUI: panel z liczbą samolotów, sliderem zasięgu, source picker (adsb.fi/airplanes.live/custom)
-- [ ] Dead-reckoning między próbkami (`gs`, `track`, `vert_rate`)
-- [ ] Click handler → `StelObjectMgr` zwraca info o samolocie
-- [ ] Build pipeline: macOS pierwszy, potem Linux, potem Windows
-- [ ] README: jak side-loadować
-
-## Instalacja toolchain (macOS)
+1. Pobierz `StellAirium-macOS-arm64.zip` z [Releases](../../releases/latest)
+2. Wypakuj i skopiuj do katalogu pluginów Stellarium:
 
 ```bash
-brew install qt
-brew install --cask stellarium
-git clone --depth 1 https://github.com/Stellarium/stellarium.git reference/stellarium-source
+mkdir -p ~/Library/Application\ Support/Stellarium/modules/StellAirium
+cp StellAirium/libStellAirium.dylib ~/Library/Application\ Support/Stellarium/modules/StellAirium/
+cp StellAirium/module.ini ~/Library/Application\ Support/Stellarium/modules/StellAirium/
+codesign --sign - --force --timestamp=none \
+  ~/Library/Application\ Support/Stellarium/modules/StellAirium/libStellAirium.dylib
 ```
 
-## Layout
+3. Uruchom Stellarium → **Konfiguracja → Wtyczki** → `StellAirium` → zaznacz **Załaduj przy starcie** → restart
+
+### Windows
+
+1. Pobierz `StellAirium-Windows-x64.zip` z [Releases](../../releases/latest)
+2. Wypakuj i skopiuj do katalogu pluginów Stellarium:
 
 ```
-aurora-stellarium-aircraft/
-├── src/                        # plugin source (.cpp, .h)
-├── cmake/                      # CMake helpers
-├── reference/                  # klon Stellarium (gitignored) jako referencja + build base
-│   └── stellarium-source/
-├── docs/                       # notatki techniczne
-└── CMakeLists.txt              # build pluginu
+%APPDATA%\Stellarium\modules\StellAirium\
 ```
+
+3. Uruchom Stellarium → **Konfiguracja → Wtyczki** → `StellAirium` → zaznacz **Załaduj przy starcie** → restart
+
+## Wymagania
+
+- Stellarium 0.21.0 lub nowszy
+- Połączenie z internetem (dane ADS-B)
 
 ## Licencja
 
-GPL v2 (Stellarium plugin = pochodna pracy Stellarium = ten sam licencjonowanie).
+GPL v2 — plugin jest pochodną Stellarium.
+
+---
+
+Autor: [astronow.pl](https://astronow.pl) / Kamil Zaraś
