@@ -41,7 +41,7 @@ jobs:
       - name: Package
         run: |
           mkdir -p dist/StellAirium
-          cp stellarium-src/build/modules/StellAirium/StellAirium.dylib dist/StellAirium/
+          cp stellarium-src/build/modules/StellAirium/libStellAirium.dylib dist/StellAirium/
           cp plugin/module.ini dist/StellAirium/
 
       - name: Upload artifact
@@ -96,7 +96,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path dist\StellAirium -Force
-          Copy-Item stellarium-src\build\modules\StellAirium\Release\StellAirium.dll dist\StellAirium\
+          Copy-Item stellarium-src\build\modules\StellAirium\Release\libStellAirium.dll dist\StellAirium\
           Copy-Item plugin\module.ini dist\StellAirium\
 
       - name: Upload artifact

@@ -43,11 +43,15 @@ TARGET_LINK_LIBRARIES(StellAirium
 )
 
 SET_TARGET_PROPERTIES(StellAirium PROPERTIES
-     PREFIX ""
      FOLDER "plugins/StellAirium"
      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules/StellAirium"
      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/modules/StellAirium"
 )
+# Stellarium oczekuje lib<Name>.dylib / lib<Name>.so / lib<Name>.dll.
+# macOS/Linux mają lib prefix domyślnie; Windows wymaga jawnego ustawienia.
+IF(WIN32)
+     SET_TARGET_PROPERTIES(StellAirium PROPERTIES PREFIX "lib")
+ENDIF()
 
 IF(APPLE)
      # Symbole Stellarium (StelApp, StelCore…) rozwiązywane z binarki w runtime.
