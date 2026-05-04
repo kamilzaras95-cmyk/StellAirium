@@ -15,8 +15,15 @@ jobs:
         with:
           path: plugin
 
-      - name: Install Qt + CMake
-        run: brew install qt cmake
+      - name: Install Qt 6.9 (musi pasować do Qt w Stellarium.app)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.9.*'
+          arch: 'clang_arm64'
+          cache: true
+
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
 
       - name: Clone Stellarium source
         run: git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
@@ -30,7 +37,6 @@ jobs:
         run: |
           cmake -B stellarium-src/build -S stellarium-src \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" \
             -DENABLE_SCRIPTING=OFF \
             -DENABLE_SHOWMYSKY=OFF \
             -DENABLE_TESTING=OFF
@@ -59,10 +65,10 @@ jobs:
         with:
           path: plugin
 
-      - name: Install Qt
+      - name: Install Qt 6.9 (musi pasować do Qt w Stellarium.app)
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.7.*'
+          version: '6.9.*'
           arch: 'win64_msvc2019_64'
           modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebengine qtwebchannel qtwebview'
           cache: true
