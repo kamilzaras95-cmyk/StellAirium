@@ -7,6 +7,7 @@
 
 #include "AuroraAircraft.hpp"
 #include "AircraftObject.hpp"
+#include "AuroraAircraftDialog.hpp"
 
 #include "StelApp.hpp"
 #include "StelCore.hpp"
@@ -31,6 +32,7 @@
 #include <QNetworkRequest>
 #include <QPainter>
 #include <QPainterPath>
+#include <QSettings>
 #include <QTimer>
 #include <QUrl>
 
@@ -47,13 +49,12 @@ StelModule* AuroraAircraftStelPluginInterface::getStelModule() const
 StelPluginInfo AuroraAircraftStelPluginInterface::getPluginInfo() const
 {
 	StelPluginInfo info;
-	info.id              = "AuroraAircraft";
-	info.displayedName   = "Aurora Aircraft (live ADS-B)";
+	info.id              = "StellAirium";
+	info.displayedName   = "StellAirium (live ADS-B)";
 	info.authors         = "astronow.pl / Kamil Zaras";
 	info.contact         = "https://astronow.pl";
 	info.description     = "Pokazuje samoloty na żywo na sferze niebieskiej "
-	                       "na podstawie danych ADS-B (adsb.fi). "
-	                       "Side-loadowy plugin dla patronów astronow.pl.";
+	                       "na podstawie danych ADS-B (adsb.fi).";
 	info.version         = "0.0.2";
 	info.license         = "GPL v2 or later";
 	return info;
@@ -64,15 +65,26 @@ StelPluginInfo AuroraAircraftStelPluginInterface::getPluginInfo() const
 // AuroraAircraft — StelModule.
 //
 
+static const QString kDefaultSourceUrl =
+    "https://opendata.adsb.fi/api/v2/lat/%1/lon/%2/dist/%3";
+
 AuroraAircraft::AuroraAircraft()
 	: networkMgr(nullptr)
 	, fetchTimer(nullptr)
 	, distNm(250)
+	, sourceUrlTemplate(kDefaultSourceUrl)
+	, fetchIntervalSec(15)
 	, lastStatus("waiting for first fetch...")
 	, aircraftCount(0)
 	, aboveHorizonCount(0)
+	, configDialog(nullptr)
 {
 	setObjectName("AuroraAircraft");
+
+	QSettings s("astronow.pl", "AuroraAircraft");
+	distNm            = s.value("distNm",            250).toInt();
+	sourceUrlTemplate = s.value("sourceUrlTemplate", kDefaultSourceUrl).toString();
+	fetchIntervalSec  = s.value("fetchIntervalSec",  15).toInt();
 }
 
 
@@ -253,10 +265,29 @@ void AuroraAircraft::init()
 
 	fetchTimer = new QTimer(this);
 	connect(fetchTimer, &QTimer::timeout, this, &AuroraAircraft::fetchAircraft);
-	fetchTimer->start(15000);  // 15s — pod limit ToS adsb.fi (~1 req/s) z dużym buforem
+	fetchTimer->start(fetchIntervalSec * 1000);
 
-	// Pierwszy fetch od razu, bez czekania 15s.
+	// Pierwszy fetch od razu, bez czekania.
 	QTimer::singleShot(500, this, &AuroraAircraft::fetchAircraft);
+
+	// Dialog konfiguracji — tworzony leniwie, pokazywany przez configureGui().
+	configDialog = new AuroraAircraftDialog();
+	configDialog->loadValues(distNm, sourceUrlTemplate, fetchIntervalSec);
+
+	connect(configDialog, &AuroraAircraftDialog::distNmChanged, this, [this](int nm) {
+		distNm = nm;
+		saveSettings();
+	});
+	connect(configDialog, &AuroraAircraftDialog::sourceUrlChanged, this, [this](const QString& url) {
+		sourceUrlTemplate = url;
+		saveSettings();
+	});
+	connect(configDialog, &AuroraAircraftDialog::fetchIntervalChanged, this, [this](int sec) {
+		fetchIntervalSec = sec;
+		fetchTimer->setInterval(sec * 1000);
+		saveSettings();
+	});
+	connect(configDialog, &AuroraAircraftDialog::fetchNowRequested, this, &AuroraAircraft::fetchAircraft);
 }
 
 void AuroraAircraft::update(double deltaTime)
@@ -308,7 +339,7 @@ void AuroraAircraft::fetchAircraft()
 	const double lat = loc.getLatitude();
 	const double lon = loc.getLongitude();
 
-	const QString urlStr = QString("https://opendata.adsb.fi/api/v2/lat/%1/lon/%2/dist/%3")
+	const QString urlStr = sourceUrlTemplate
 	                       .arg(lat, 0, 'f', 4)
 	                       .arg(lon, 0, 'f', 4)
 	                       .arg(distNm);
@@ -378,6 +409,30 @@ void AuroraAircraft::onReply(QNetworkReply* reply)
 	             .arg(QString::number(serverNow, 'f', 1));
 
 	qDebug().noquote() << "[AuroraAircraft]" << lastStatus;
+
+	if (configDialog)
+		configDialog->setStatus(aircraftCount, aboveHorizonCount);
+}
+
+bool AuroraAircraft::configureGui(bool show)
+{
+	if (!configDialog) return false;
+	if (show) {
+		configDialog->show();
+		configDialog->raise();
+		configDialog->activateWindow();
+	} else {
+		configDialog->hide();
+	}
+	return true;
+}
+
+void AuroraAircraft::saveSettings() const
+{
+	QSettings s("astronow.pl", "AuroraAircraft");
+	s.setValue("distNm",            distNm);
+	s.setValue("sourceUrlTemplate", sourceUrlTemplate);
+	s.setValue("fetchIntervalSec",  fetchIntervalSec);
 }
 
 void AuroraAircraft::onLocationChanged(const StelLocation& loc)
@@ -398,7 +453,7 @@ void AuroraAircraft::draw(StelCore* core)
 	p2d.setFont(fontStatus);
 
 	const float vw = static_cast<float>(p2d.getProjector()->getViewportWidth());
-	const QString badge = QString("✈ Aurora Aircraft — %1 aloft / %2 in radius")
+	const QString badge = QString("✈ StellAirium — %1 aloft / %2 in radius")
 	                      .arg(aboveHorizonCount).arg(aircraftCount);
 	p2d.drawText(vw - 280.0f, 18.0f, badge);
 

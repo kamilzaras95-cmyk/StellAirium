@@ -10,9 +10,11 @@ build-*/
 # Stellarium source clone — duże, każdy klonuje sobie sam
 reference/stellarium-source/
 
-# Distribution: Aviarium.app (~1 GB) + zip (~575 MB) — zbyt duże do gita
-dist/Aviarium.app/
-dist/Aviarium-*.zip
+# Distribution artifacts — zbyt duże do gita
+dist/
+
+# Emaile i pliki robocze
+email-*.txt
 
 # IDE / editor
 .vscode/

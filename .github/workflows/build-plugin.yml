@@ -1,0 +1,130 @@
+name: Build StellAirium plugin
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  # ── macOS arm64 ────────────────────────────────────────────────────────────
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Install Qt + CMake
+        run: brew install qt cmake
+
+      - name: Clone Stellarium source
+        run: |
+          git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
+
+      - name: Link plugin into Stellarium tree
+        run: |
+          ln -sf "$GITHUB_WORKSPACE/plugin" stellarium-src/plugins/StellAirium
+
+      - name: CMake configure
+        run: |
+          cmake -B stellarium-src/build -S stellarium-src \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" \
+            -DENABLE_SCRIPTING=OFF \
+            -DENABLE_SHOWMYSKY=OFF \
+            -DENABLE_TESTING=OFF
+
+      - name: Build StellAirium module
+        run: |
+          cmake --build stellarium-src/build --target StellAirium -j$(sysctl -n hw.logicalcpu)
+
+      - name: Package
+        run: |
+          mkdir -p dist/StellAirium
+          cp stellarium-src/build/modules/StellAirium/StellAirium.dylib dist/StellAirium/
+          cp plugin/module.ini dist/StellAirium/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StellAirium-macOS-arm64
+          path: dist/
+
+  # ── Windows x64 ───────────────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.*'
+          arch: 'win64_msvc2019_64'
+          modules: 'qtwebengine qtwebview'
+
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Clone Stellarium source
+        run: |
+          git clone --depth 1 https://github.com/Stellarium/stellarium.git stellarium-src
+
+      - name: Link plugin into Stellarium tree
+        run: |
+          New-Item -ItemType Junction `
+            -Path "$env:GITHUB_WORKSPACE\stellarium-src\plugins\StellAirium" `
+            -Target "$env:GITHUB_WORKSPACE\plugin"
+
+      - name: CMake configure
+        run: |
+          cmake -B stellarium-src/build -S stellarium-src `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DENABLE_SCRIPTING=OFF `
+            -DENABLE_SHOWMYSKY=OFF `
+            -DENABLE_TESTING=OFF
+
+      - name: Build StellAirium module
+        run: |
+          cmake --build stellarium-src/build --target StellAirium `
+            --config Release -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Package
+        run: |
+          mkdir dist\StellAirium
+          copy stellarium-src\build\modules\StellAirium\Release\StellAirium.dll dist\StellAirium\
+          copy plugin\module.ini dist\StellAirium\
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StellAirium-Windows-x64
+          path: dist/
+
+  # ── GitHub Release — tworzy release z obu plików przy tagu v* ─────────────
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Zip artifacts
+        run: |
+          zip -r StellAirium-macOS-arm64.zip StellAirium-macOS-arm64/
+          zip -r StellAirium-Windows-x64.zip StellAirium-Windows-x64/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            StellAirium-macOS-arm64.zip
+            StellAirium-Windows-x64.zip
+          generate_release_notes: true

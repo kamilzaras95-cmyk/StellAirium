@@ -1,6 +1,6 @@
 /*
  * AuroraAircraft — plugin Stellarium pokazujący samoloty na żywo.
- * Copyright (C) 2026 astronow.pl / Kamil Zaras
+ * Copyright (C) 2026 Kamil Zaras
  * Licensed under GNU GPL v2 or later.
  */
 

@@ -1,7 +1,7 @@
 # aurora-stellarium-aircraft
 
 Stellarium plugin pokazujący samoloty na żywo na sferze niebieskiej.
-Side-loadowy plugin dla patronów astronow.pl — bez weryfikacji w oficjalnym plugin manager Stellarium.
+Side-loadowy plugin — bez weryfikacji w oficjalnym plugin manager Stellarium.
 
 ## Status
 
@@ -26,7 +26,7 @@ MVP — w trakcie projektowania.
 - [ ] Dead-reckoning między próbkami (`gs`, `track`, `vert_rate`)
 - [ ] Click handler → `StelObjectMgr` zwraca info o samolocie
 - [ ] Build pipeline: macOS pierwszy, potem Linux, potem Windows
-- [ ] README dla patronów: jak side-loadować
+- [ ] README: jak side-loadować
 
 ## Instalacja toolchain (macOS)
 

@@ -14,8 +14,11 @@
 
 #include <QList>
 #include <QObject>
+#include <QSettings>
 #include <QSharedPointer>
 #include <QString>
+
+class AuroraAircraftDialog;
 
 class StelCore;
 class QNetworkAccessManager;
@@ -68,6 +71,7 @@ public:
 	void update(double deltaTime) override;
 	void draw(StelCore* core) override;
 	double getCallOrder(StelModuleActionName actionName) const override;
+	bool configureGui(bool show = true) override;
 
 	// === StelObjectModule API ===
 	QList<StelObjectP> searchAround(const Vec3d& v, double limitFov, const StelCore* core) const override;
@@ -79,19 +83,25 @@ public:
 	QString getStelObjectType() const override { return "AuroraAircraft"; }
 
 private slots:
-	//! Triggerowane przez QTimer co 15s — robi GET na /api/v2/lat/lon/dist.
+	//! Triggerowane przez QTimer co fetchIntervalSec — robi GET na URL źródła.
 	void fetchAircraft();
-	//! Odpowiedź z adsb.fi — parsuje JSON, aktualizuje aircraftCount + lastStatus.
+	//! Odpowiedź z serwera ADS-B — parsuje JSON, aktualizuje aircraftCount + lastStatus.
 	void onReply(QNetworkReply* reply);
 	//! Stellarium zmienił lokalizację (user kliknął F6) — od razu fetch.
 	void onLocationChanged(const StelLocation& loc);
+	//! Zapisuje bieżące ustawienia do QSettings.
+	void saveSettings() const;
 
 private:
 	QNetworkAccessManager* networkMgr;
 	QTimer* fetchTimer;
 
-	//! Promień zapytania w nm. 250 ≈ ~460 km — pokrywa horyzont z dużym zapasem.
+	//! Promień zapytania w nm (domyślnie 250, zmieniany przez dialog).
 	int distNm;
+	//! Szablon URL źródła danych — %1=lat, %2=lon, %3=distNm.
+	QString sourceUrlTemplate;
+	//! Interwał fetchu w sekundach.
+	int fetchIntervalSec;
 
 	//! Status do wyświetlenia w draw() — zmienia się gdy fetch wraca.
 	QString lastStatus;
@@ -103,6 +113,8 @@ private:
 
 	//! Tekstura sylwetki samolotu, generowana w init() przez QPainter.
 	StelTextureSP iconTex;
+
+	AuroraAircraftDialog* configDialog;
 };
 
 
