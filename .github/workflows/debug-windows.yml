@@ -1,0 +1,78 @@
+name: Debug StellAirium Windows plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to build
+        required: false
+        default: main
+      artifact_suffix:
+        description: Optional artifact suffix
+        required: false
+        default: debug
+
+concurrency:
+  group: debug-windows-${{ github.event.inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  STELLARIUM_TAG: v26.1
+  QT_VERSION_WINDOWS: 6.9.3
+
+jobs:
+  build-windows-debug:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+          ref: ${{ github.event.inputs.ref || github.ref }}
+
+      - name: Install Qt 6.9
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION_WINDOWS }}
+          arch: 'win64_msvc2022_64'
+          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtspeech qtimageformats'
+          cache: true
+
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Clone Stellarium source
+        run: git clone --depth 1 --branch "${{ env.STELLARIUM_TAG }}" https://github.com/Stellarium/stellarium.git stellarium-src
+
+      - name: Link plugin into Stellarium tree
+        shell: pwsh
+        run: |
+          New-Item -ItemType Junction `
+            -Path "$env:GITHUB_WORKSPACE\stellarium-src\plugins\StellAirium" `
+            -Target "$env:GITHUB_WORKSPACE\plugin"
+          Add-Content stellarium-src\plugins\CMakeLists.txt "`nADD_SUBDIRECTORY(StellAirium)"
+
+      - name: CMake configure
+        run: |
+          cmake -B stellarium-src/build -S stellarium-src `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DENABLE_SCRIPTING=OFF `
+            -DENABLE_QTWEBENGINE=OFF `
+            -DENABLE_SHOWMYSKY=OFF `
+            -DENABLE_TESTING=OFF
+
+      - name: Build StellAirium module
+        run: cmake --build stellarium-src/build --target StellAirium --config Release -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Package debug artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist\StellAirium -Force
+          Copy-Item stellarium-src\build\modules\StellAirium\Release\libStellAirium.dll dist\StellAirium\
+          Copy-Item plugin\module.ini dist\StellAirium\
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StellAirium-Stellarium26.1-Windows-x64-${{ github.event.inputs.artifact_suffix || 'debug' }}
+          path: dist/
