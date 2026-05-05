@@ -80,6 +80,8 @@ AuroraAircraft::AuroraAircraft()
 	, latestRequestId(0)
 	, inFlightReply(nullptr)
 	, configDialog(nullptr)
+	, initCompleted(false)
+	, deinitRequested(false)
 {
 	setObjectName("AuroraAircraft");
 
@@ -248,6 +250,32 @@ AuroraAircraft::~AuroraAircraft()
 void AuroraAircraft::init()
 {
 	qDebug() << "[StellAirium] init() start";
+	deinitRequested = false;
+	QTimer::singleShot(0, this, &AuroraAircraft::finishInit);
+}
+
+void AuroraAircraft::deinit()
+{
+	qDebug() << "[StellAirium] deinit() start";
+	deinitRequested = true;
+	if (inFlightReply)
+		inFlightReply->abort();
+	if (fetchTimer)
+		fetchTimer->stop();
+	if (configDialog) {
+		configDialog->hide();
+		configDialog->deleteLater();
+		configDialog = nullptr;
+	}
+	initCompleted = false;
+	qDebug() << "[StellAirium] deinit() done";
+}
+
+void AuroraAircraft::finishInit()
+{
+	if (initCompleted || deinitRequested)
+		return;
+	initCompleted = true;
 
 	// Rejestracja jako provider StelObject — dzięki temu Stellarium wie,
 	// że nasze samoloty są klikalne i potrafi pokazać info-panel po lewej.

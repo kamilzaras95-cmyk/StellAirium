@@ -69,6 +69,7 @@ public:
 
 	// === StelModule API ===
 	void init() override;
+	void deinit() override;
 	void update(double deltaTime) override;
 	void draw(StelCore* core) override;
 	double getCallOrder(StelModuleActionName actionName) const override;
@@ -84,6 +85,8 @@ public:
 	QString getStelObjectType() const override { return "AuroraAircraft"; }
 
 private slots:
+	//! Właściwa inicjalizacja uruchamiana po powrocie do event loop.
+	void finishInit();
 	//! Triggerowane przez QTimer co fetchIntervalSec — robi GET na URL źródła.
 	void fetchAircraft();
 	//! Odpowiedź z serwera ADS-B — parsuje JSON, aktualizuje aircraftCount + lastStatus.
@@ -118,6 +121,8 @@ private:
 	StelTextureSP iconTex;
 
 	AuroraAircraftDialog* configDialog;
+	bool initCompleted;
+	bool deinitRequested;
 };
 
 
