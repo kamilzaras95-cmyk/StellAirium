@@ -74,7 +74,7 @@ static StelCore* findStelCore()
 
 static StelObjectMgr* findStelObjectMgr()
 {
-	return &StelApp::getInstance().getStelObjectMgr();
+	return GETSTELMODULE_SILENT(StelObjectMgr);
 }
 
 AuroraAircraft::AuroraAircraft()
@@ -91,6 +91,8 @@ AuroraAircraft::AuroraAircraft()
 	, configDialog(nullptr)
 	, initCompleted(false)
 	, deinitRequested(false)
+	, objectMgrRegistered(false)
+	, coreConnected(false)
 {
 	setObjectName("AuroraAircraft");
 
@@ -267,6 +269,8 @@ void AuroraAircraft::deinit()
 {
 	qDebug() << "[StellAirium] deinit() start";
 	deinitRequested = true;
+	objectMgrRegistered = false;
+	coreConnected = false;
 	if (inFlightReply)
 		inFlightReply->abort();
 	if (fetchTimer)
@@ -286,17 +290,6 @@ void AuroraAircraft::finishInit()
 		return;
 	initCompleted = true;
 
-	// Rejestracja jako provider StelObject — używamy oficjalnych accessorów
-	// Stellarium, tak jak robią to jego własne pluginy.
-	qDebug() << "[StellAirium] init() — findStelObjectMgr()";
-	StelObjectMgr* objMgr = findStelObjectMgr();
-	if (!objMgr) {
-		qWarning() << "[StellAirium] init() — StelObjectMgr not found";
-		return;
-	}
-	objMgr->registerStelObjectMgr(this);
-	qDebug() << "[StellAirium] init() — object provider OK";
-
 	qDebug() << "[StellAirium] init() — new QNetworkAccessManager";
 	networkMgr = new QNetworkAccessManager(this);
 	connect(networkMgr, &QNetworkAccessManager::finished,
@@ -305,14 +298,7 @@ void AuroraAircraft::finishInit()
 
 	// Reaguj na zmianę lokalizacji w Stellarium (F6) — natychmiast fetch.
 	qDebug() << "[StellAirium] init() — connect locationChanged";
-	StelCore* core = findStelCore();
-	if (!core) {
-		qWarning() << "[StellAirium] init() — StelCore not found";
-		return;
-	}
-	connect(core, &StelCore::locationChanged,
-	        this, &AuroraAircraft::onLocationChanged);
-	qDebug() << "[StellAirium] init() — locationChanged OK";
+	ensureRuntimeWiring();
 
 	qDebug() << "[StellAirium] init() — new QTimer";
 	fetchTimer = new QTimer(this);
@@ -346,8 +332,34 @@ void AuroraAircraft::finishInit()
 	connect(configDialog, &AuroraAircraftDialog::fetchNowRequested, this, &AuroraAircraft::fetchAircraft);
 }
 
+void AuroraAircraft::ensureRuntimeWiring()
+{
+	if (deinitRequested)
+		return;
+
+	if (!objectMgrRegistered) {
+		StelObjectMgr* objMgr = findStelObjectMgr();
+		if (objMgr) {
+			objMgr->registerStelObjectMgr(this);
+			objectMgrRegistered = true;
+			qDebug() << "[StellAirium] init() — object provider OK";
+		}
+	}
+
+	if (!coreConnected) {
+		StelCore* core = findStelCore();
+		if (core) {
+			connect(core, &StelCore::locationChanged,
+			        this, &AuroraAircraft::onLocationChanged);
+			coreConnected = true;
+			qDebug() << "[StellAirium] init() — locationChanged OK";
+		}
+	}
+}
+
 void AuroraAircraft::update(double deltaTime)
 {
+	ensureRuntimeWiring();
 	if (aircraft.isEmpty() || deltaTime <= 0) return;
 
 	// Pozycja obserwatora ze Stellarium (uaktualniana per-klatkę,
@@ -392,6 +404,7 @@ double AuroraAircraft::getCallOrder(StelModuleActionName actionName) const
 
 void AuroraAircraft::fetchAircraft()
 {
+	ensureRuntimeWiring();
 	const qint64 requestId = ++latestRequestId;
 	StelCore* core = findStelCore();
 	if (!core) return;
@@ -527,6 +540,7 @@ void AuroraAircraft::onLocationChanged(const StelLocation& loc)
 
 void AuroraAircraft::draw(StelCore* core)
 {
+	ensureRuntimeWiring();
 	// === 1. Subtelny status w prawym dolnym rogu — niech nie zasłania nieba ===
 	StelPainter p2d(core->getProjection2d());
 	p2d.setColor(0.4f, 0.85f, 1.0f, 0.55f); // niebieski, pół-przezroczysty

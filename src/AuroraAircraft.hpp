@@ -97,6 +97,9 @@ private slots:
 	void saveSettings() const;
 
 private:
+	//! Próbuj podpiąć Stellarium managers, ale nie zakładaj, że są gotowe już w init().
+	void ensureRuntimeWiring();
+
 	QNetworkAccessManager* networkMgr;
 	QTimer* fetchTimer;
 
@@ -123,6 +126,8 @@ private:
 	AuroraAircraftDialog* configDialog;
 	bool initCompleted;
 	bool deinitRequested;
+	bool objectMgrRegistered;
+	bool coreConnected;
 };
 
 
