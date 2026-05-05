@@ -17,6 +17,7 @@ env:
 jobs:
   # ── macOS arm64 ────────────────────────────────────────────────────────────
   build-macos:
+    if: false  # TEMP: pominąć przy najbliższych pushach — patron testuje ARM64. Usunąć po zielonym ARM64.
     runs-on: macos-15
     steps:
       - name: Checkout plugin
@@ -69,6 +70,7 @@ jobs:
 
   # ── Windows x64 ───────────────────────────────────────────────────────────
   build-windows:
+    if: false  # TEMP: pominąć przy najbliższych pushach — patron testuje ARM64. Usunąć po zielonym ARM64.
     runs-on: windows-2025
     steps:
       - name: Checkout plugin
@@ -123,9 +125,89 @@ jobs:
           name: StellAirium-Stellarium26.1-Windows-x64
           path: dist/
 
+  # ── Windows ARM64 (cross-compiled na hoście x64) ──────────────────────────
+  # Dla Parallels Desktop / Surface Pro X / Snapdragon X Elite. Qt cross-compile
+  # wymaga DWÓCH instalacji: host (x64, do uruchomienia moc/uic/rcc tooli) +
+  # target (arm64, biblioteki do linkowania). CMake potem dostaje QT_HOST_PATH.
+  build-windows-arm64:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout plugin
+        uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - name: Install Qt 6.9 host (x64) — moc/uic/rcc tools
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION_WINDOWS }}
+          arch: 'win64_msvc2022_64'
+          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtspeech qtimageformats'
+          cache: true
+          set-env: false  # nie eksportuj Qt6_DIR — to ma robić target install niżej
+
+      - name: Save host Qt path for cross-compile
+        shell: pwsh
+        run: |
+          $hostQt = (Get-ChildItem "${env:RUNNER_WORKSPACE}\Qt\${{ env.QT_VERSION_WINDOWS }}\msvc2022_64" -Directory | Select-Object -First 1).FullName
+          if (-not $hostQt) { throw "Host Qt ${{ env.QT_VERSION_WINDOWS }} x64 not found" }
+          echo "QT_HOST_PATH=$hostQt" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "QT_HOST_PATH=$hostQt"
+
+      - name: Install Qt 6.9 target (arm64) — biblioteki do linkowania
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION_WINDOWS }}
+          arch: 'win64_msvc2022_arm64_cross_compiled'
+          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtspeech qtimageformats'
+          cache: true
+
+      - name: Install CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Clone Stellarium source
+        run: git clone --depth 1 --branch "${{ env.STELLARIUM_TAG }}" https://github.com/Stellarium/stellarium.git stellarium-src
+
+      - name: Link plugin into Stellarium tree
+        shell: pwsh
+        run: |
+          New-Item -ItemType Junction `
+            -Path "$env:GITHUB_WORKSPACE\stellarium-src\plugins\StellAirium" `
+            -Target "$env:GITHUB_WORKSPACE\plugin"
+          Add-Content stellarium-src\plugins\CMakeLists.txt "`nADD_SUBDIRECTORY(StellAirium)"
+
+      - name: CMake configure (cross-compile ARM64)
+        run: |
+          cmake -B stellarium-src/build -S stellarium-src `
+            -G "Visual Studio 17 2022" -A ARM64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DQT_HOST_PATH="${env:QT_HOST_PATH}" `
+            -DENABLE_SCRIPTING=OFF `
+            -DENABLE_QTWEBENGINE=OFF `
+            -DENABLE_SHOWMYSKY=OFF `
+            -DENABLE_TESTING=OFF
+
+      - name: Build StellAirium module (ARM64)
+        run: cmake --build stellarium-src/build --target StellAirium --config Release -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist\StellAirium -Force
+          Copy-Item stellarium-src\build\modules\StellAirium\Release\libStellAirium.dll dist\StellAirium\
+          Copy-Item plugin\module.ini dist\StellAirium\
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StellAirium-Stellarium26.1-Windows-arm64
+          path: dist/
+
   # ── GitHub Release ─────────────────────────────────────────────────────────
+  # TEMP: tymczasowo tylko Windows ARM64. Po włączeniu macOS i Windows x64
+  # (usunięcie `if: false` wyżej) dorzuć tu z powrotem do `needs:` i `files:`.
   release:
-    needs: [build-macos, build-windows]
+    needs: [build-windows-arm64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -136,13 +218,11 @@ jobs:
 
       - name: Zip artifacts
         run: |
-          zip -r StellAirium-Stellarium26.1-macOS-arm64.zip StellAirium-Stellarium26.1-macOS-arm64/
-          zip -r StellAirium-Stellarium26.1-Windows-x64.zip StellAirium-Stellarium26.1-Windows-x64/
+          zip -r StellAirium-Stellarium26.1-Windows-arm64.zip StellAirium-Stellarium26.1-Windows-arm64/
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            StellAirium-Stellarium26.1-macOS-arm64.zip
-            StellAirium-Stellarium26.1-Windows-x64.zip
+            StellAirium-Stellarium26.1-Windows-arm64.zip
           generate_release_notes: true
