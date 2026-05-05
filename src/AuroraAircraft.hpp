@@ -97,7 +97,8 @@ private slots:
 	void saveSettings() const;
 
 private:
-	//! Próbuj podpiąć Stellarium managers, ale nie zakładaj, że są gotowe już w init().
+	void ensureIconTexture();
+	void ensureConfigDialog();
 	void ensureRuntimeWiring();
 
 	QNetworkAccessManager* networkMgr;

@@ -259,6 +259,40 @@ AuroraAircraft::~AuroraAircraft()
 {
 }
 
+void AuroraAircraft::ensureIconTexture()
+{
+	if (iconTex)
+		return;
+
+	const QImage iconImg = makeJetIcon(64);
+	iconTex = StelApp::getInstance().getTextureManager().createTexture(iconImg);
+}
+
+void AuroraAircraft::ensureConfigDialog()
+{
+	if (configDialog)
+		return;
+
+	configDialog = new AuroraAircraftDialog();
+	configDialog->loadValues(distNm, sourceUrlTemplate, fetchIntervalSec);
+
+	connect(configDialog, &AuroraAircraftDialog::distNmChanged, this, [this](int nm) {
+		distNm = nm;
+		saveSettings();
+	});
+	connect(configDialog, &AuroraAircraftDialog::sourceUrlChanged, this, [this](const QString& url) {
+		sourceUrlTemplate = url;
+		saveSettings();
+	});
+	connect(configDialog, &AuroraAircraftDialog::fetchIntervalChanged, this, [this](int sec) {
+		fetchIntervalSec = sec;
+		if (fetchTimer)
+			fetchTimer->setInterval(sec * 1000);
+		saveSettings();
+	});
+	connect(configDialog, &AuroraAircraftDialog::fetchNowRequested, this, &AuroraAircraft::fetchAircraft);
+}
+
 void AuroraAircraft::init()
 {
 	qDebug() << "[StellAirium] init() start";
@@ -276,8 +310,18 @@ void AuroraAircraft::deinit()
 	if (inFlightReply)
 		inFlightReply->abort();
 	if (fetchTimer)
+	{
 		fetchTimer->stop();
-	if (configDialog) {
+		fetchTimer->deleteLater();
+		fetchTimer = nullptr;
+	}
+	if (networkMgr)
+	{
+		networkMgr->deleteLater();
+		networkMgr = nullptr;
+	}
+	if (configDialog)
+	{
 		configDialog->hide();
 		configDialog->deleteLater();
 		configDialog = nullptr;
@@ -298,8 +342,6 @@ void AuroraAircraft::finishInit()
 	        this, &AuroraAircraft::onReply);
 	qDebug() << "[StellAirium] init() — network OK";
 
-	// Reaguj na zmianę lokalizacji w Stellarium (F6) — podpinamy to lazy,
-	// poza krytyczną ścieżką startupu.
 	qDebug() << "[StellAirium] init() — defer locationChanged wiring";
 
 	qDebug() << "[StellAirium] init() — new QTimer";
@@ -307,28 +349,6 @@ void AuroraAircraft::finishInit()
 	connect(fetchTimer, &QTimer::timeout, this, &AuroraAircraft::fetchAircraft);
 	fetchTimer->start(fetchIntervalSec * 1000);
 	qDebug() << "[StellAirium] init() — timer OK";
-
-	// Dialog konfiguracji — tworzony leniwie, pokazywany przez configureGui().
-	qDebug() << "[StellAirium] init() — new AuroraAircraftDialog";
-	configDialog = new AuroraAircraftDialog();
-	qDebug() << "[StellAirium] init() — dialog ctor OK, loading values";
-	configDialog->loadValues(distNm, sourceUrlTemplate, fetchIntervalSec);
-	qDebug() << "[StellAirium] init() — dialog values OK";
-
-	connect(configDialog, &AuroraAircraftDialog::distNmChanged, this, [this](int nm) {
-		distNm = nm;
-		saveSettings();
-	});
-	connect(configDialog, &AuroraAircraftDialog::sourceUrlChanged, this, [this](const QString& url) {
-		sourceUrlTemplate = url;
-		saveSettings();
-	});
-	connect(configDialog, &AuroraAircraftDialog::fetchIntervalChanged, this, [this](int sec) {
-		fetchIntervalSec = sec;
-		fetchTimer->setInterval(sec * 1000);
-		saveSettings();
-	});
-	connect(configDialog, &AuroraAircraftDialog::fetchNowRequested, this, &AuroraAircraft::fetchAircraft);
 }
 
 void AuroraAircraft::ensureRuntimeWiring()
@@ -336,18 +356,22 @@ void AuroraAircraft::ensureRuntimeWiring()
 	if (deinitRequested)
 		return;
 
-	if (!objectMgrRegistered) {
+	if (!objectMgrRegistered)
+	{
 		StelObjectMgr* objMgr = findStelObjectMgr();
-		if (objMgr) {
+		if (objMgr)
+		{
 			objMgr->registerStelObjectMgr(this);
 			objectMgrRegistered = true;
 			qDebug() << "[StellAirium] init() — object provider OK";
 		}
 	}
 
-	if (!coreConnected) {
+	if (!coreConnected)
+	{
 		StelCore* core = findStelCore();
-		if (core) {
+		if (core)
+		{
 			connect(core, &StelCore::locationChanged,
 			        this, &AuroraAircraft::onLocationChanged);
 			coreConnected = true;
@@ -359,7 +383,8 @@ void AuroraAircraft::ensureRuntimeWiring()
 void AuroraAircraft::update(double deltaTime)
 {
 	ensureRuntimeWiring();
-	if (!initialFetchDone && objectMgrRegistered && coreConnected) {
+	if (!initialFetchDone && initCompleted && networkMgr && objectMgrRegistered && coreConnected)
+	{
 		initialFetchDone = true;
 		fetchAircraft();
 	}
@@ -408,6 +433,8 @@ double AuroraAircraft::getCallOrder(StelModuleActionName actionName) const
 void AuroraAircraft::fetchAircraft()
 {
 	ensureRuntimeWiring();
+	if (!networkMgr)
+		return;
 	const qint64 requestId = ++latestRequestId;
 	StelCore* core = findStelCore();
 	if (!core) return;
@@ -514,6 +541,7 @@ void AuroraAircraft::onReply(QNetworkReply* reply)
 
 bool AuroraAircraft::configureGui(bool show)
 {
+	ensureConfigDialog();
 	if (!configDialog) return false;
 	if (show) {
 		configDialog->show();
@@ -544,6 +572,8 @@ void AuroraAircraft::onLocationChanged(const StelLocation& loc)
 void AuroraAircraft::draw(StelCore* core)
 {
 	ensureRuntimeWiring();
+	ensureIconTexture();
+
 	// === 1. Subtelny status w prawym dolnym rogu — niech nie zasłania nieba ===
 	StelPainter p2d(core->getProjection2d());
 	p2d.setColor(0.4f, 0.85f, 1.0f, 0.55f); // niebieski, pół-przezroczysty
@@ -563,10 +593,7 @@ void AuroraAircraft::draw(StelCore* core)
 	fontLabel.setPixelSize(13);
 	pSky.setFont(fontLabel);
 
-	// Lazy-init: createTexture wymaga aktywnego kontekstu GL (niedostępnego w init()).
-	if (!iconTex)
-		iconTex = StelApp::getInstance().getTextureManager().createTexture(makeJetIcon(64));
-
+	// Tekstura sylwetki + blending — wymagane dla drawSprite2dMode.
 	if (iconTex)
 		iconTex->bind();
 	pSky.setBlending(true, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
