@@ -249,12 +249,6 @@ void AuroraAircraft::init()
 {
 	qDebug() << "[StellAirium] init() start";
 
-	// Generuj teksture sylwetki samolotu raz, przy starcie pluginu.
-	qDebug() << "[StellAirium] init() — makeJetIcon + createTexture";
-	const QImage iconImg = makeJetIcon(64);
-	iconTex = StelApp::getInstance().getTextureManager().createTexture(iconImg);
-	qDebug() << "[StellAirium] init() — texture OK";
-
 	// Rejestracja jako provider StelObject — dzięki temu Stellarium wie,
 	// że nasze samoloty są klikalne i potrafi pokazać info-panel po lewej.
 	qDebug() << "[StellAirium] init() — GETSTELMODULE(StelObjectMgr)";
@@ -506,7 +500,10 @@ void AuroraAircraft::draw(StelCore* core)
 	fontLabel.setPixelSize(13);
 	pSky.setFont(fontLabel);
 
-	// Tekstura sylwetki + blending — wymagane dla drawSprite2dMode.
+	// Lazy-init: createTexture wymaga aktywnego kontekstu GL (niedostępnego w init()).
+	if (!iconTex)
+		iconTex = StelApp::getInstance().getTextureManager().createTexture(makeJetIcon(64));
+
 	if (iconTex)
 		iconTex->bind();
 	pSky.setBlending(true, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
