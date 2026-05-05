@@ -182,6 +182,7 @@ jobs:
             -G "Visual Studio 17 2022" -A ARM64 `
             -DCMAKE_BUILD_TYPE=Release `
             -DQT_HOST_PATH="${env:QT_HOST_PATH}" `
+            -DENABLE_NLS=OFF `
             -DENABLE_SCRIPTING=OFF `
             -DENABLE_QTWEBENGINE=OFF `
             -DENABLE_SHOWMYSKY=OFF `
