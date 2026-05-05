@@ -93,6 +93,7 @@ AuroraAircraft::AuroraAircraft()
 	, deinitRequested(false)
 	, objectMgrRegistered(false)
 	, coreConnected(false)
+	, initialFetchDone(false)
 {
 	setObjectName("AuroraAircraft");
 
@@ -271,6 +272,7 @@ void AuroraAircraft::deinit()
 	deinitRequested = true;
 	objectMgrRegistered = false;
 	coreConnected = false;
+	initialFetchDone = false;
 	if (inFlightReply)
 		inFlightReply->abort();
 	if (fetchTimer)
@@ -296,21 +298,15 @@ void AuroraAircraft::finishInit()
 	        this, &AuroraAircraft::onReply);
 	qDebug() << "[StellAirium] init() — network OK";
 
-	// Reaguj na zmianę lokalizacji w Stellarium (F6) — natychmiast fetch.
-	qDebug() << "[StellAirium] init() — connect locationChanged";
+	// Reaguj na zmianę lokalizacji w Stellarium (F6) — podpinamy to lazy,
+	// poza krytyczną ścieżką startupu.
+	qDebug() << "[StellAirium] init() — defer locationChanged wiring";
 
 	qDebug() << "[StellAirium] init() — new QTimer";
 	fetchTimer = new QTimer(this);
 	connect(fetchTimer, &QTimer::timeout, this, &AuroraAircraft::fetchAircraft);
 	fetchTimer->start(fetchIntervalSec * 1000);
 	qDebug() << "[StellAirium] init() — timer OK";
-
-	// Pierwszy fetch od razu, bez czekania.
-	QTimer::singleShot(500, this, &AuroraAircraft::fetchAircraft);
-
-	// Managerów Stellarium podpinamy już po wyjściu z init(),
-	// żeby nie robić tego na tym samym stosie startupu.
-	QTimer::singleShot(0, this, &AuroraAircraft::ensureRuntimeWiring);
 
 	// Dialog konfiguracji — tworzony leniwie, pokazywany przez configureGui().
 	qDebug() << "[StellAirium] init() — new AuroraAircraftDialog";
@@ -363,6 +359,10 @@ void AuroraAircraft::ensureRuntimeWiring()
 void AuroraAircraft::update(double deltaTime)
 {
 	ensureRuntimeWiring();
+	if (!initialFetchDone && objectMgrRegistered && coreConnected) {
+		initialFetchDone = true;
+		fetchAircraft();
+	}
 	if (aircraft.isEmpty() || deltaTime <= 0) return;
 
 	// Pozycja obserwatora ze Stellarium (uaktualniana per-klatkę,

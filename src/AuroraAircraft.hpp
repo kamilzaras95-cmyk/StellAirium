@@ -128,6 +128,7 @@ private:
 	bool deinitRequested;
 	bool objectMgrRegistered;
 	bool coreConnected;
+	bool initialFetchDone;
 };
 
 
