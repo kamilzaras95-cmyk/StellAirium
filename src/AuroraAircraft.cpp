@@ -298,7 +298,6 @@ void AuroraAircraft::finishInit()
 
 	// Reaguj na zmianę lokalizacji w Stellarium (F6) — natychmiast fetch.
 	qDebug() << "[StellAirium] init() — connect locationChanged";
-	ensureRuntimeWiring();
 
 	qDebug() << "[StellAirium] init() — new QTimer";
 	fetchTimer = new QTimer(this);
@@ -308,6 +307,10 @@ void AuroraAircraft::finishInit()
 
 	// Pierwszy fetch od razu, bez czekania.
 	QTimer::singleShot(500, this, &AuroraAircraft::fetchAircraft);
+
+	// Managerów Stellarium podpinamy już po wyjściu z init(),
+	// żeby nie robić tego na tym samym stosie startupu.
+	QTimer::singleShot(0, this, &AuroraAircraft::ensureRuntimeWiring);
 
 	// Dialog konfiguracji — tworzony leniwie, pokazywany przez configureGui().
 	qDebug() << "[StellAirium] init() — new AuroraAircraftDialog";
