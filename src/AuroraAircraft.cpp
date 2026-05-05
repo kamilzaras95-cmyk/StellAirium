@@ -71,6 +71,12 @@ static StelCore* findStelCore()
 	return StelApp::getInstance().getCore();
 }
 
+#ifndef STELLAIRIUM_DEBUG_STAGE
+#define STELLAIRIUM_DEBUG_STAGE 4
+#endif
+
+static constexpr int kStellAiriumDebugStage = STELLAIRIUM_DEBUG_STAGE;
+
 AuroraAircraft::AuroraAircraft()
 	: networkMgr(nullptr)
 	, fetchTimer(nullptr)
@@ -293,7 +299,7 @@ void AuroraAircraft::init()
 	qDebug() << "[StellAirium] smoke init()";
 	return;
 #else
-	qDebug() << "[StellAirium] init() start";
+	qDebug() << "[StellAirium] init() start stage" << kStellAiriumDebugStage;
 	deinitRequested = false;
 	QTimer::singleShot(0, this, &AuroraAircraft::finishInit);
 #endif
@@ -379,6 +385,12 @@ void AuroraAircraft::update(double deltaTime)
 	Q_UNUSED(deltaTime);
 	return;
 #else
+	if (kStellAiriumDebugStage < 2)
+	{
+		Q_UNUSED(deltaTime);
+		return;
+	}
+
 	ensureRuntimeWiring();
 	if (!initialFetchDone && initCompleted && networkMgr && coreConnected)
 	{
@@ -433,6 +445,9 @@ void AuroraAircraft::fetchAircraft()
 #ifdef STELLAIRIUM_SMOKE_TEST
 	return;
 #else
+	if (kStellAiriumDebugStage < 2)
+		return;
+
 	ensureRuntimeWiring();
 	if (!networkMgr)
 		return;
@@ -547,6 +562,12 @@ bool AuroraAircraft::configureGui(bool show)
 	Q_UNUSED(show);
 	return false;
 #else
+	if (kStellAiriumDebugStage < 4)
+	{
+		Q_UNUSED(show);
+		return false;
+	}
+
 	ensureConfigDialog();
 	if (!configDialog) return false;
 	if (show) {
@@ -574,6 +595,12 @@ void AuroraAircraft::onLocationChanged(const StelLocation& loc)
 	Q_UNUSED(loc);
 	return;
 #else
+	if (kStellAiriumDebugStage < 2)
+	{
+		Q_UNUSED(loc);
+		return;
+	}
+
 	qDebug() << "[AuroraAircraft] location changed → "
 	         << loc.getLatitude() << loc.getLongitude()
 	         << "— refetching";
@@ -587,6 +614,12 @@ void AuroraAircraft::draw(StelCore* core)
 	Q_UNUSED(core);
 	return;
 #else
+	if (kStellAiriumDebugStage < 3)
+	{
+		Q_UNUSED(core);
+		return;
+	}
+
 	ensureRuntimeWiring();
 
 	if (aircraft.isEmpty())
@@ -603,6 +636,9 @@ void AuroraAircraft::draw(StelCore* core)
 	const QString badge = QString("✈ StellAirium — %1 aloft / %2 in radius")
 	                      .arg(aboveHorizonCount).arg(aircraftCount);
 	p2d.drawText(vw - 280.0f, 18.0f, badge);
+
+	if (kStellAiriumDebugStage < 4)
+		return;
 
 	// === 2. Markery samolotow na sferze niebieskiej (AltAz frame) ===
 	const StelProjectorP prj = core->getProjection(StelCore::FrameAltAz);
