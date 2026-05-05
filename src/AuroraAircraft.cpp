@@ -69,7 +69,7 @@ static const QString kDefaultSourceUrl =
 
 static StelCore* findStelCore()
 {
-	return &StelApp::getInstance().getCore();
+	return StelApp::getInstance().getCore();
 }
 
 static StelObjectMgr* findStelObjectMgr()
