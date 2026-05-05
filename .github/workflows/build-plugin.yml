@@ -29,7 +29,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION_MACOS }}
           arch: 'clang_64'
-          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebengine qtwebchannel qtwebview'
+          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtspeech qtimageformats'
           cache: true
 
       - name: Install CMake
@@ -48,6 +48,7 @@ jobs:
           cmake -B stellarium-src/build -S stellarium-src \
             -DCMAKE_BUILD_TYPE=Release \
             -DENABLE_SCRIPTING=OFF \
+            -DENABLE_QTWEBENGINE=OFF \
             -DENABLE_SHOWMYSKY=OFF \
             -DENABLE_TESTING=OFF
 
@@ -80,7 +81,7 @@ jobs:
         with:
           version: ${{ env.QT_VERSION_WINDOWS }}
           arch: 'win64_msvc2022_64'
-          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtwebengine qtwebchannel qtwebview'
+          modules: 'qtcharts qtpositioning qtserialport qtmultimedia qtspeech qtimageformats'
           cache: true
 
       - name: Install CMake
@@ -102,6 +103,7 @@ jobs:
           cmake -B stellarium-src/build -S stellarium-src `
             -DCMAKE_BUILD_TYPE=Release `
             -DENABLE_SCRIPTING=OFF `
+            -DENABLE_QTWEBENGINE=OFF `
             -DENABLE_SHOWMYSKY=OFF `
             -DENABLE_TESTING=OFF
 
