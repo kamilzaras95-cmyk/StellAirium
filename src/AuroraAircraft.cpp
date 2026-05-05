@@ -12,7 +12,6 @@
 #include "StelApp.hpp"
 #include "StelCore.hpp"
 #include "StelObjectMgr.hpp"
-#include "StelModuleMgr.hpp"
 #include "StelPainter.hpp"
 #include "StelProjector.hpp"
 #include "StelTexture.hpp"
@@ -75,7 +74,7 @@ static StelCore* findStelCore()
 
 static StelObjectMgr* findStelObjectMgr()
 {
-	return GETSTELMODULE_SILENT(StelObjectMgr);
+	return &StelApp::getInstance().getStelObjectMgr();
 }
 
 AuroraAircraft::AuroraAircraft()
