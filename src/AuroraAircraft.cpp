@@ -69,12 +69,12 @@ static const QString kDefaultSourceUrl =
 
 static StelCore* findStelCore()
 {
-	return qApp ? qApp->findChild<StelCore*>("StelCore") : nullptr;
+	return &StelApp::getInstance().getCore();
 }
 
 static StelObjectMgr* findStelObjectMgr()
 {
-	return qApp ? qApp->findChild<StelObjectMgr*>("StelObjectMgr") : nullptr;
+	return &StelApp::getInstance().getStelObjectMgr();
 }
 
 AuroraAircraft::AuroraAircraft()
@@ -286,8 +286,8 @@ void AuroraAircraft::finishInit()
 		return;
 	initCompleted = true;
 
-	// Rejestracja jako provider StelObject — używamy bezpośredniego getter'a
-	// z QObject tree, żeby ominąć ABI-sensitive inline access do StelApp.
+	// Rejestracja jako provider StelObject — używamy oficjalnych accessorów
+	// Stellarium, tak jak robią to jego własne pluginy.
 	qDebug() << "[StellAirium] init() — findStelObjectMgr()";
 	StelObjectMgr* objMgr = findStelObjectMgr();
 	if (!objMgr) {
