@@ -247,34 +247,52 @@ AuroraAircraft::~AuroraAircraft()
 
 void AuroraAircraft::init()
 {
-	qDebug() << "[AuroraAircraft] init()";
+	qDebug() << "[StellAirium] init() start";
 
 	// Generuj teksture sylwetki samolotu raz, przy starcie pluginu.
+	qDebug() << "[StellAirium] init() — makeJetIcon + createTexture";
 	const QImage iconImg = makeJetIcon(64);
 	iconTex = StelApp::getInstance().getTextureManager().createTexture(iconImg);
+	qDebug() << "[StellAirium] init() — texture OK";
 
 	// Rejestracja jako provider StelObject — dzięki temu Stellarium wie,
 	// że nasze samoloty są klikalne i potrafi pokazać info-panel po lewej.
-	GETSTELMODULE(StelObjectMgr)->registerStelObjectMgr(this);
+	qDebug() << "[StellAirium] init() — GETSTELMODULE(StelObjectMgr)";
+	StelObjectMgr* objMgr = GETSTELMODULE(StelObjectMgr);
+	if (!objMgr) {
+		qWarning() << "[StellAirium] init() — StelObjectMgr is null!";
+	} else {
+		objMgr->registerStelObjectMgr(this);
+	}
+	qDebug() << "[StellAirium] init() — object provider OK";
 
+	qDebug() << "[StellAirium] init() — new QNetworkAccessManager";
 	networkMgr = new QNetworkAccessManager(this);
 	connect(networkMgr, &QNetworkAccessManager::finished,
 	        this, &AuroraAircraft::onReply);
+	qDebug() << "[StellAirium] init() — network OK";
 
 	// Reaguj na zmianę lokalizacji w Stellarium (F6) — natychmiast fetch.
+	qDebug() << "[StellAirium] init() — connect locationChanged";
 	connect(StelApp::getInstance().getCore(), &StelCore::locationChanged,
 	        this, &AuroraAircraft::onLocationChanged);
+	qDebug() << "[StellAirium] init() — locationChanged OK";
 
+	qDebug() << "[StellAirium] init() — new QTimer";
 	fetchTimer = new QTimer(this);
 	connect(fetchTimer, &QTimer::timeout, this, &AuroraAircraft::fetchAircraft);
 	fetchTimer->start(fetchIntervalSec * 1000);
+	qDebug() << "[StellAirium] init() — timer OK";
 
 	// Pierwszy fetch od razu, bez czekania.
 	QTimer::singleShot(500, this, &AuroraAircraft::fetchAircraft);
 
 	// Dialog konfiguracji — tworzony leniwie, pokazywany przez configureGui().
+	qDebug() << "[StellAirium] init() — new AuroraAircraftDialog";
 	configDialog = new AuroraAircraftDialog();
+	qDebug() << "[StellAirium] init() — dialog ctor OK, loading values";
 	configDialog->loadValues(distNm, sourceUrlTemplate, fetchIntervalSec);
+	qDebug() << "[StellAirium] init() — dialog values OK";
 
 	connect(configDialog, &AuroraAircraftDialog::distNmChanged, this, [this](int nm) {
 		distNm = nm;
