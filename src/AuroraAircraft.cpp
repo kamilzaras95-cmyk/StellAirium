@@ -359,10 +359,17 @@ void AuroraAircraft::finishInit()
 	connect(fetchTimer, &QTimer::timeout, this, &AuroraAircraft::fetchAircraft);
 	fetchTimer->start(fetchIntervalSec * 1000);
 	qDebug() << "[StellAirium] init() — timer OK";
+
+	if (kStellAiriumDebugStage >= 2)
+	{
+		qDebug() << "[StellAirium] init() — schedule first fetch heartbeat";
+		QTimer::singleShot(1000, this, &AuroraAircraft::fetchAircraft);
+	}
 }
 
 void AuroraAircraft::ensureRuntimeWiring()
 {
+	static bool loggedWaitingForCore = false;
 	if (deinitRequested)
 		return;
 
@@ -376,6 +383,11 @@ void AuroraAircraft::ensureRuntimeWiring()
 			coreConnected = true;
 			qDebug() << "[StellAirium] init() — locationChanged OK";
 		}
+		else if (!loggedWaitingForCore)
+		{
+			loggedWaitingForCore = true;
+			qDebug() << "[StellAirium] waiting for StelCore in ensureRuntimeWiring()";
+		}
 	}
 }
 
@@ -385,15 +397,27 @@ void AuroraAircraft::update(double deltaTime)
 	Q_UNUSED(deltaTime);
 	return;
 #else
+	static int updateHeartbeatCount = 0;
 	if (kStellAiriumDebugStage < 2)
 	{
 		Q_UNUSED(deltaTime);
 		return;
 	}
 
+	if (updateHeartbeatCount < 5)
+	{
+		++updateHeartbeatCount;
+		qDebug() << "[StellAirium] update heartbeat" << updateHeartbeatCount
+		         << "deltaTime=" << deltaTime
+		         << "coreConnected=" << coreConnected
+		         << "initCompleted=" << initCompleted
+		         << "aircraft=" << aircraft.size();
+	}
+
 	ensureRuntimeWiring();
 	if (!initialFetchDone && initCompleted && networkMgr && coreConnected)
 	{
+		qDebug() << "[StellAirium] update() — first fetch gate opened";
 		initialFetchDone = true;
 		fetchAircraft();
 	}
@@ -450,10 +474,17 @@ void AuroraAircraft::fetchAircraft()
 
 	ensureRuntimeWiring();
 	if (!networkMgr)
+	{
+		qDebug() << "[StellAirium] fetch skipped: networkMgr not ready";
 		return;
+	}
 	const qint64 requestId = ++latestRequestId;
 	StelCore* core = findStelCore();
-	if (!core) return;
+	if (!core)
+	{
+		qDebug() << "[StellAirium] fetch skipped: StelCore not ready";
+		return;
+	}
 	const StelLocation& loc = core->getCurrentLocation();
 	const double lat = loc.getLatitude();
 	const double lon = loc.getLongitude();
@@ -614,6 +645,7 @@ void AuroraAircraft::draw(StelCore* core)
 	Q_UNUSED(core);
 	return;
 #else
+	static int drawHeartbeatCount = 0;
 	if (kStellAiriumDebugStage < 3)
 	{
 		Q_UNUSED(core);
@@ -621,9 +653,6 @@ void AuroraAircraft::draw(StelCore* core)
 	}
 
 	ensureRuntimeWiring();
-
-	if (aircraft.isEmpty())
-		return;
 
 	// === 1. Subtelny status w prawym dolnym rogu — niech nie zasłania nieba ===
 	StelPainter p2d(core->getProjection2d());
@@ -633,11 +662,24 @@ void AuroraAircraft::draw(StelCore* core)
 	p2d.setFont(fontStatus);
 
 	const float vw = static_cast<float>(p2d.getProjector()->getViewportWidth());
-	const QString badge = QString("✈ StellAirium — %1 aloft / %2 in radius")
-	                      .arg(aboveHorizonCount).arg(aircraftCount);
+	if (drawHeartbeatCount < 5)
+	{
+		++drawHeartbeatCount;
+		qDebug() << "[StellAirium] draw heartbeat" << drawHeartbeatCount
+		         << "aircraft=" << aircraft.size()
+		         << "status=" << lastStatus;
+	}
+
+	const QString badge = QString("✈ StellAirium — %1 | %2 aloft / %3 in radius")
+	                      .arg(lastStatus)
+	                      .arg(aboveHorizonCount)
+	                      .arg(aircraftCount);
 	p2d.drawText(vw - 280.0f, 18.0f, badge);
 
 	if (kStellAiriumDebugStage < 4)
+		return;
+
+	if (aircraft.isEmpty())
 		return;
 
 	// === 2. Markery samolotow na sferze niebieskiej (AltAz frame) ===
