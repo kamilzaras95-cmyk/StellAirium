@@ -9,11 +9,13 @@
 #include "AircraftObject.hpp"
 #include "AuroraAircraftDialog.hpp"
 
+#include "StelApp.hpp"
 #include "StelCore.hpp"
 #include "StelObjectMgr.hpp"
 #include "StelPainter.hpp"
 #include "StelProjector.hpp"
 #include "StelTexture.hpp"
+#include "StelTextureMgr.hpp"
 #include "StelUtils.hpp"
 #include "VecMath.hpp"
 
@@ -545,8 +547,8 @@ void AuroraAircraft::draw(StelCore* core)
 	pSky.setFont(fontLabel);
 
 	// Lazy-init: createTexture wymaga aktywnego kontekstu GL (niedostępnego w init()).
-	if (!iconTex && StelTexture::textureMgr)
-		iconTex = StelTexture::textureMgr->createTexture(makeJetIcon(64));
+	if (!iconTex)
+		iconTex = StelApp::getInstance().getTextureManager().createTexture(makeJetIcon(64));
 
 	if (iconTex)
 		iconTex->bind();
