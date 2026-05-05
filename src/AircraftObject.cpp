@@ -6,6 +6,7 @@
 
 #include "AircraftObject.hpp"
 
+#include "StelApp.hpp"
 #include "StelCore.hpp"
 #include "StelLocation.hpp"
 #include "StelTranslator.hpp"
@@ -30,13 +31,17 @@ QString AircraftObject::getEnglishName() const
 
 Vec3d AircraftObject::getJ2000EquatorialPos(const StelCore* core) const
 {
+	const StelCore* effectiveCore = core ? core : StelApp::getInstance().getCore();
+	if (!effectiveCore)
+		return Vec3d(0.0, 0.0, 1.0);
+
 	// Stellarium FrameAltAz: +x=south, +y=east, +z=zenith.
 	// lng = (180° - az_geodesic) mod 360°. Patrz AuroraAircraft::draw().
 	Vec3d altAzVec;
 	const double lng = (180.0 - snap.azDeg) * (M_PI / 180.0);
 	const double lat = snap.altDeg * (M_PI / 180.0);
 	StelUtils::spheToRect(lng, lat, altAzVec);
-	return core->altAzToJ2000(altAzVec, StelCore::RefractionOff);
+	return effectiveCore->altAzToJ2000(altAzVec, StelCore::RefractionOff);
 }
 
 QString AircraftObject::getInfoString(const StelCore* core, const InfoStringGroup& flags) const
