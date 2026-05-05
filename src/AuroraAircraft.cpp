@@ -11,7 +11,6 @@
 
 #include "StelApp.hpp"
 #include "StelCore.hpp"
-#include "StelModuleMgr.hpp"
 #include "StelObjectMgr.hpp"
 #include "StelPainter.hpp"
 #include "StelProjector.hpp"
@@ -277,15 +276,11 @@ void AuroraAircraft::finishInit()
 		return;
 	initCompleted = true;
 
-	// Rejestracja jako provider StelObject — dzięki temu Stellarium wie,
-	// że nasze samoloty są klikalne i potrafi pokazać info-panel po lewej.
-	qDebug() << "[StellAirium] init() — GETSTELMODULE(StelObjectMgr)";
-	StelObjectMgr* objMgr = GETSTELMODULE(StelObjectMgr);
-	if (!objMgr) {
-		qWarning() << "[StellAirium] init() — StelObjectMgr is null!";
-	} else {
-		objMgr->registerStelObjectMgr(this);
-	}
+	// Rejestracja jako provider StelObject — używamy bezpośredniego getter'a
+	// z StelApp, tak jak robi to sam Stellarium w kilku modułach GUI/core.
+	qDebug() << "[StellAirium] init() — getStelObjectMgr()";
+	StelObjectMgr& objMgr = StelApp::getInstance().getStelObjectMgr();
+	objMgr.registerStelObjectMgr(this);
 	qDebug() << "[StellAirium] init() — object provider OK";
 
 	qDebug() << "[StellAirium] init() — new QNetworkAccessManager";
