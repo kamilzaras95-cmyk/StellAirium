@@ -556,6 +556,9 @@ void AuroraAircraft::draw(StelCore* core)
 {
 	ensureRuntimeWiring();
 
+	if (aircraft.isEmpty())
+		return;
+
 	// === 1. Subtelny status w prawym dolnym rogu — niech nie zasłania nieba ===
 	StelPainter p2d(core->getProjection2d());
 	p2d.setColor(0.4f, 0.85f, 1.0f, 0.55f); // niebieski, pół-przezroczysty
@@ -574,9 +577,6 @@ void AuroraAircraft::draw(StelCore* core)
 	QFont fontLabel = QGuiApplication::font();
 	fontLabel.setPixelSize(13);
 	pSky.setFont(fontLabel);
-
-	if (aircraft.isEmpty())
-		return;
 
 	ensureIconTexture();
 
