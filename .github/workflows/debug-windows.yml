@@ -11,6 +11,10 @@ on:
         description: Optional artifact suffix
         required: false
         default: debug
+      build_mode:
+        description: Build mode (full or smoke)
+        required: false
+        default: smoke
 
 concurrency:
   group: debug-windows-${{ github.event.inputs.ref || github.ref }}
@@ -53,13 +57,16 @@ jobs:
           Add-Content stellarium-src\plugins\CMakeLists.txt "`nADD_SUBDIRECTORY(StellAirium)"
 
       - name: CMake configure
+        env:
+          SMOKE_FLAG: ${{ github.event.inputs.build_mode == 'smoke' && 'ON' || 'OFF' }}
         run: |
           cmake -B stellarium-src/build -S stellarium-src `
             -DCMAKE_BUILD_TYPE=Release `
             -DENABLE_SCRIPTING=OFF `
             -DENABLE_QTWEBENGINE=OFF `
             -DENABLE_SHOWMYSKY=OFF `
-            -DENABLE_TESTING=OFF
+            -DENABLE_TESTING=OFF `
+            -DSTELLAIRIUM_SMOKE_TEST=$env:SMOKE_FLAG
 
       - name: Build StellAirium module
         run: cmake --build stellarium-src/build --target StellAirium --config Release -j $env:NUMBER_OF_PROCESSORS
@@ -74,5 +81,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: StellAirium-Stellarium26.1-Windows-x64-${{ github.event.inputs.artifact_suffix || 'debug' }}
+          name: StellAirium-Stellarium26.1-Windows-x64-${{ github.event.inputs.build_mode || 'smoke' }}-${{ github.event.inputs.artifact_suffix || 'debug' }}
           path: dist/

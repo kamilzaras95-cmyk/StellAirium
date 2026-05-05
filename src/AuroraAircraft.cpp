@@ -289,13 +289,22 @@ void AuroraAircraft::ensureConfigDialog()
 
 void AuroraAircraft::init()
 {
+#ifdef STELLAIRIUM_SMOKE_TEST
+	qDebug() << "[StellAirium] smoke init()";
+	return;
+#else
 	qDebug() << "[StellAirium] init() start";
 	deinitRequested = false;
 	QTimer::singleShot(0, this, &AuroraAircraft::finishInit);
+#endif
 }
 
 void AuroraAircraft::deinit()
 {
+#ifdef STELLAIRIUM_SMOKE_TEST
+	qDebug() << "[StellAirium] smoke deinit()";
+	return;
+#else
 	qDebug() << "[StellAirium] deinit() start";
 	deinitRequested = true;
 	objectMgrRegistered = false;
@@ -322,6 +331,7 @@ void AuroraAircraft::deinit()
 	}
 	initCompleted = false;
 	qDebug() << "[StellAirium] deinit() done";
+#endif
 }
 
 void AuroraAircraft::finishInit()
@@ -365,6 +375,10 @@ void AuroraAircraft::ensureRuntimeWiring()
 
 void AuroraAircraft::update(double deltaTime)
 {
+#ifdef STELLAIRIUM_SMOKE_TEST
+	Q_UNUSED(deltaTime);
+	return;
+#else
 	ensureRuntimeWiring();
 	if (!initialFetchDone && initCompleted && networkMgr && coreConnected)
 	{
@@ -404,6 +418,7 @@ void AuroraAircraft::update(double deltaTime)
 		if (a.altDeg > 0) ++newAboveHorizon;
 	}
 	aboveHorizonCount = newAboveHorizon;
+#endif
 }
 
 double AuroraAircraft::getCallOrder(StelModuleActionName actionName) const
@@ -415,6 +430,9 @@ double AuroraAircraft::getCallOrder(StelModuleActionName actionName) const
 
 void AuroraAircraft::fetchAircraft()
 {
+#ifdef STELLAIRIUM_SMOKE_TEST
+	return;
+#else
 	ensureRuntimeWiring();
 	if (!networkMgr)
 		return;
@@ -441,6 +459,7 @@ void AuroraAircraft::fetchAircraft()
 	req.setRawHeader("Accept", "application/json");
 	inFlightReply = networkMgr->get(req);
 	inFlightReply->setProperty("requestId", requestId);
+#endif
 }
 
 void AuroraAircraft::onReply(QNetworkReply* reply)
@@ -524,6 +543,10 @@ void AuroraAircraft::onReply(QNetworkReply* reply)
 
 bool AuroraAircraft::configureGui(bool show)
 {
+#ifdef STELLAIRIUM_SMOKE_TEST
+	Q_UNUSED(show);
+	return false;
+#else
 	ensureConfigDialog();
 	if (!configDialog) return false;
 	if (show) {
@@ -534,6 +557,7 @@ bool AuroraAircraft::configureGui(bool show)
 		configDialog->hide();
 	}
 	return true;
+#endif
 }
 
 void AuroraAircraft::saveSettings() const
@@ -546,14 +570,23 @@ void AuroraAircraft::saveSettings() const
 
 void AuroraAircraft::onLocationChanged(const StelLocation& loc)
 {
+#ifdef STELLAIRIUM_SMOKE_TEST
+	Q_UNUSED(loc);
+	return;
+#else
 	qDebug() << "[AuroraAircraft] location changed → "
 	         << loc.getLatitude() << loc.getLongitude()
 	         << "— refetching";
 	fetchAircraft();
+#endif
 }
 
 void AuroraAircraft::draw(StelCore* core)
 {
+#ifdef STELLAIRIUM_SMOKE_TEST
+	Q_UNUSED(core);
+	return;
+#else
 	ensureRuntimeWiring();
 
 	if (aircraft.isEmpty())
@@ -631,6 +664,7 @@ void AuroraAircraft::draw(StelCore* core)
 		              static_cast<float>(winPos[1]) - 4.0f,
 		              labelMain + labelType);
 	}
+#endif
 }
 
 
