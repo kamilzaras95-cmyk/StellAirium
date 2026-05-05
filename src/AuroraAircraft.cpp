@@ -9,13 +9,11 @@
 #include "AircraftObject.hpp"
 #include "AuroraAircraftDialog.hpp"
 
-#include "StelApp.hpp"
 #include "StelCore.hpp"
 #include "StelObjectMgr.hpp"
 #include "StelPainter.hpp"
 #include "StelProjector.hpp"
 #include "StelTexture.hpp"
-#include "StelTextureMgr.hpp"
 #include "StelUtils.hpp"
 #include "VecMath.hpp"
 
@@ -66,6 +64,16 @@ StelPluginInfo AuroraAircraftStelPluginInterface::getPluginInfo() const
 
 static const QString kDefaultSourceUrl =
     "https://opendata.adsb.fi/api/v2/lat/%1/lon/%2/dist/%3";
+
+static StelCore* findStelCore()
+{
+	return qApp ? qApp->findChild<StelCore*>("StelCore") : nullptr;
+}
+
+static StelObjectMgr* findStelObjectMgr()
+{
+	return qApp ? qApp->findChild<StelObjectMgr*>("StelObjectMgr") : nullptr;
+}
 
 AuroraAircraft::AuroraAircraft()
 	: networkMgr(nullptr)
@@ -277,10 +285,14 @@ void AuroraAircraft::finishInit()
 	initCompleted = true;
 
 	// Rejestracja jako provider StelObject — używamy bezpośredniego getter'a
-	// z StelApp, tak jak robi to sam Stellarium w kilku modułach GUI/core.
-	qDebug() << "[StellAirium] init() — getStelObjectMgr()";
-	StelObjectMgr& objMgr = StelApp::getInstance().getStelObjectMgr();
-	objMgr.registerStelObjectMgr(this);
+	// z QObject tree, żeby ominąć ABI-sensitive inline access do StelApp.
+	qDebug() << "[StellAirium] init() — findStelObjectMgr()";
+	StelObjectMgr* objMgr = findStelObjectMgr();
+	if (!objMgr) {
+		qWarning() << "[StellAirium] init() — StelObjectMgr not found";
+		return;
+	}
+	objMgr->registerStelObjectMgr(this);
 	qDebug() << "[StellAirium] init() — object provider OK";
 
 	qDebug() << "[StellAirium] init() — new QNetworkAccessManager";
@@ -291,7 +303,12 @@ void AuroraAircraft::finishInit()
 
 	// Reaguj na zmianę lokalizacji w Stellarium (F6) — natychmiast fetch.
 	qDebug() << "[StellAirium] init() — connect locationChanged";
-	connect(StelApp::getInstance().getCore(), &StelCore::locationChanged,
+	StelCore* core = findStelCore();
+	if (!core) {
+		qWarning() << "[StellAirium] init() — StelCore not found";
+		return;
+	}
+	connect(core, &StelCore::locationChanged,
 	        this, &AuroraAircraft::onLocationChanged);
 	qDebug() << "[StellAirium] init() — locationChanged OK";
 
@@ -333,7 +350,8 @@ void AuroraAircraft::update(double deltaTime)
 
 	// Pozycja obserwatora ze Stellarium (uaktualniana per-klatkę,
 	// żeby przy zmianie lokalizacji F6 reagować od razu).
-	StelCore* core = StelApp::getInstance().getCore();
+	StelCore* core = findStelCore();
+	if (!core) return;
 	const StelLocation& loc = core->getCurrentLocation();
 	const double obsLat = loc.getLatitude();
 	const double obsLon = loc.getLongitude();
@@ -373,7 +391,9 @@ double AuroraAircraft::getCallOrder(StelModuleActionName actionName) const
 void AuroraAircraft::fetchAircraft()
 {
 	const qint64 requestId = ++latestRequestId;
-	const StelLocation& loc = StelApp::getInstance().getCore()->getCurrentLocation();
+	StelCore* core = findStelCore();
+	if (!core) return;
+	const StelLocation& loc = core->getCurrentLocation();
 	const double lat = loc.getLatitude();
 	const double lon = loc.getLongitude();
 
@@ -438,7 +458,8 @@ void AuroraAircraft::onReply(QNetworkReply* reply)
 	aircraftCount = ac.size();
 
 	// Pozycja obserwatora ze Stellarium — używamy tej samej, której user właśnie patrzy.
-	StelCore* core = StelApp::getInstance().getCore();
+	StelCore* core = findStelCore();
+	if (!core) return;
 	const StelLocation& loc = core->getCurrentLocation();
 	const double obsLat = loc.getLatitude();
 	const double obsLon = loc.getLongitude();
@@ -524,8 +545,8 @@ void AuroraAircraft::draw(StelCore* core)
 	pSky.setFont(fontLabel);
 
 	// Lazy-init: createTexture wymaga aktywnego kontekstu GL (niedostępnego w init()).
-	if (!iconTex)
-		iconTex = StelApp::getInstance().getTextureManager().createTexture(makeJetIcon(64));
+	if (!iconTex && StelTexture::textureMgr)
+		iconTex = StelTexture::textureMgr->createTexture(makeJetIcon(64));
 
 	if (iconTex)
 		iconTex->bind();
