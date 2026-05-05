@@ -60,9 +60,13 @@ IF(APPLE)
           LINK_FLAGS "-undefined dynamic_lookup"
      )
 ELSEIF(WIN32)
-     # Na Windows musimy linkować z stelMain żeby rozwiązać symbole Stellarium.
-     # stelMain jest dostępny gdy budujemy wewnątrz drzewa źródeł Stellarium.
-     IF(TARGET stelMain)
+     # Na Windows plugin musi rozwiązać symbole Stellarium z targetu,
+     # który faktycznie je eksportuje w danym buildzie.
+     # Dla buildów MinGW istnieje współdzielone stelMain, ale w oficjalnych
+     # buildach MSVC symbole eksportuje stellarium.exe (ENABLE_EXPORTS TRUE).
+     IF(TARGET stellarium)
+          TARGET_LINK_LIBRARIES(StellAirium stellarium)
+     ELSEIF(TARGET stelMain)
           TARGET_LINK_LIBRARIES(StellAirium stelMain)
      ENDIF()
 ENDIF()
