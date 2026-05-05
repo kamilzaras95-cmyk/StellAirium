@@ -11,7 +11,6 @@
 
 #include "StelApp.hpp"
 #include "StelCore.hpp"
-#include "StelObjectMgr.hpp"
 #include "StelPainter.hpp"
 #include "StelProjector.hpp"
 #include "StelTexture.hpp"
@@ -70,11 +69,6 @@ static const QString kDefaultSourceUrl =
 static StelCore* findStelCore()
 {
 	return StelApp::getInstance().getCore();
-}
-
-static StelObjectMgr* findStelObjectMgr()
-{
-	return &StelApp::getInstance().getStelObjectMgr();
 }
 
 AuroraAircraft::AuroraAircraft()
@@ -356,17 +350,6 @@ void AuroraAircraft::ensureRuntimeWiring()
 	if (deinitRequested)
 		return;
 
-	if (!objectMgrRegistered)
-	{
-		StelObjectMgr* objMgr = findStelObjectMgr();
-		if (objMgr)
-		{
-			objMgr->registerStelObjectMgr(this);
-			objectMgrRegistered = true;
-			qDebug() << "[StellAirium] init() — object provider OK";
-		}
-	}
-
 	if (!coreConnected)
 	{
 		StelCore* core = findStelCore();
@@ -383,7 +366,7 @@ void AuroraAircraft::ensureRuntimeWiring()
 void AuroraAircraft::update(double deltaTime)
 {
 	ensureRuntimeWiring();
-	if (!initialFetchDone && initCompleted && networkMgr && objectMgrRegistered && coreConnected)
+	if (!initialFetchDone && initCompleted && networkMgr && coreConnected)
 	{
 		initialFetchDone = true;
 		fetchAircraft();
@@ -572,7 +555,6 @@ void AuroraAircraft::onLocationChanged(const StelLocation& loc)
 void AuroraAircraft::draw(StelCore* core)
 {
 	ensureRuntimeWiring();
-	ensureIconTexture();
 
 	// === 1. Subtelny status w prawym dolnym rogu — niech nie zasłania nieba ===
 	StelPainter p2d(core->getProjection2d());
@@ -592,6 +574,11 @@ void AuroraAircraft::draw(StelCore* core)
 	QFont fontLabel = QGuiApplication::font();
 	fontLabel.setPixelSize(13);
 	pSky.setFont(fontLabel);
+
+	if (aircraft.isEmpty())
+		return;
+
+	ensureIconTexture();
 
 	// Tekstura sylwetki + blending — wymagane dla drawSprite2dMode.
 	if (iconTex)
