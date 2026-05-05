@@ -647,10 +647,25 @@ void AuroraAircraft::draw(StelCore* core)
 	fontLabel.setPixelSize(13);
 	pSky.setFont(fontLabel);
 
-	ensureIconTexture();
+	if (kStellAiriumDebugStage < 5)
+		return;
+
+	bool useTexture = false;
+	bool drawSprite = false;
+	bool drawLabels = false;
+
+	if (kStellAiriumDebugStage >= 5)
+		drawLabels = true;
+	if (kStellAiriumDebugStage >= 6)
+		useTexture = true;
+	if (kStellAiriumDebugStage >= 7)
+		drawSprite = true;
+
+	if (useTexture)
+		ensureIconTexture();
 
 	// Tekstura sylwetki + blending — wymagane dla drawSprite2dMode.
-	if (iconTex)
+	if (useTexture && iconTex)
 		iconTex->bind();
 	pSky.setBlending(true, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -687,18 +702,24 @@ void AuroraAircraft::draw(StelCore* core)
 		// drawSprite2dMode rotuje od "nos w prawo" CCW. Eksperymentalnie:
 		// rotacja = trueTrackDeg - 90 — żeby track=0 (północ) wskazywał w "górę" ekranu.
 		pSky.setColor(col[0], col[1], col[2], 0.95f);
-		pSky.drawSprite2dMode(static_cast<float>(winPos[0]),
-		                      static_cast<float>(winPos[1]),
-		                      spriteSize,
-		                      static_cast<float>(a.trueTrackDeg - 90.0));
+		if (drawSprite)
+		{
+			pSky.drawSprite2dMode(static_cast<float>(winPos[0]),
+			                      static_cast<float>(winPos[1]),
+			                      spriteSize,
+			                      static_cast<float>(a.trueTrackDeg - 90.0));
+		}
 
 		// Etykieta callsign + ICAO type, obok ikonki (nie używamy noGravity bo
 		// chcemy żeby label szedł z orientacją widoku).
-		const QString labelMain = a.callsign.isEmpty() ? a.icao24 : a.callsign;
-		const QString labelType = a.aircraftType.isEmpty() ? "" : QStringLiteral(" ") + a.aircraftType;
-		pSky.drawText(static_cast<float>(winPos[0]) + spriteSize + 2.0f,
-		              static_cast<float>(winPos[1]) - 4.0f,
-		              labelMain + labelType);
+		if (drawLabels)
+		{
+			const QString labelMain = a.callsign.isEmpty() ? a.icao24 : a.callsign;
+			const QString labelType = a.aircraftType.isEmpty() ? "" : QStringLiteral(" ") + a.aircraftType;
+			pSky.drawText(static_cast<float>(winPos[0]) + spriteSize + 2.0f,
+			              static_cast<float>(winPos[1]) - 4.0f,
+			              labelMain + labelType);
+		}
 	}
 #endif
 }
