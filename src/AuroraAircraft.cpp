@@ -390,16 +390,26 @@ void AuroraAircraft::finishInit()
 void AuroraAircraft::ensureRuntimeWiring()
 {
 	static bool loggedWaitingForCore = false;
+	static int wiringHeartbeatCount = 0;
 	if (deinitRequested)
 		return;
 
 	if (!coreConnected)
 	{
+		if (wiringHeartbeatCount < 5)
+		{
+			++wiringHeartbeatCount;
+			qDebug() << "[StellAirium] ensureRuntimeWiring heartbeat" << wiringHeartbeatCount
+			         << "before findStelCore()";
+		}
 		StelCore* core = findStelCore();
+		qDebug() << "[StellAirium] ensureRuntimeWiring core ptr =" << core;
 		if (core)
 		{
+			qDebug() << "[StellAirium] ensureRuntimeWiring before locationChanged connect";
 			connect(core, &StelCore::locationChanged,
 			        this, &AuroraAircraft::onLocationChanged);
+			qDebug() << "[StellAirium] ensureRuntimeWiring after locationChanged connect";
 			coreConnected = true;
 			qDebug() << "[StellAirium] init() — locationChanged OK";
 		}
