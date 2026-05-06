@@ -64,6 +64,8 @@ jobs:
         env:
           SMOKE_FLAG: ${{ github.event.inputs.build_mode == 'smoke' && 'ON' || 'OFF' }}
           DEBUG_STAGE: ${{ github.event.inputs.debug_stage || '1' }}
+          BUILD_MODE: ${{ github.event.inputs.build_mode || 'smoke' }}
+          BUILD_COMMIT: ${{ github.sha }}
         run: |
           cmake -B stellarium-src/build -S stellarium-src `
             -DCMAKE_BUILD_TYPE=Release `
@@ -72,17 +74,28 @@ jobs:
             -DENABLE_SHOWMYSKY=OFF `
             -DENABLE_TESTING=OFF `
             -DSTELLAIRIUM_SMOKE_TEST=$env:SMOKE_FLAG `
-            -DSTELLAIRIUM_DEBUG_STAGE=$env:DEBUG_STAGE
+            -DSTELLAIRIUM_DEBUG_STAGE=$env:DEBUG_STAGE `
+            -DSTELLAIRIUM_BUILD_MODE=$env:BUILD_MODE `
+            -DSTELLAIRIUM_BUILD_COMMIT=$env:BUILD_COMMIT
 
       - name: Build StellAirium module
         run: cmake --build stellarium-src/build --target StellAirium --config Release -j $env:NUMBER_OF_PROCESSORS
 
       - name: Package debug artifact
         shell: pwsh
+        env:
+          BUILD_MODE: ${{ github.event.inputs.build_mode || 'smoke' }}
+          DEBUG_STAGE: ${{ github.event.inputs.debug_stage || '1' }}
+          BUILD_COMMIT: ${{ github.sha }}
         run: |
           New-Item -ItemType Directory -Path dist\StellAirium -Force
           Copy-Item stellarium-src\build\modules\StellAirium\Release\libStellAirium.dll dist\StellAirium\
           Copy-Item plugin\module.ini dist\StellAirium\
+          @(
+            "mode=$env:BUILD_MODE"
+            "stage=$env:DEBUG_STAGE"
+            "commit=$env:BUILD_COMMIT"
+          ) | Set-Content dist\StellAirium\build-info.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

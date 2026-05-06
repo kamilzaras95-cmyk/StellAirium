@@ -75,7 +75,17 @@ static StelCore* findStelCore()
 #define STELLAIRIUM_DEBUG_STAGE 4
 #endif
 
+#ifndef STELLAIRIUM_BUILD_MODE
+#define STELLAIRIUM_BUILD_MODE "full"
+#endif
+
+#ifndef STELLAIRIUM_BUILD_COMMIT
+#define STELLAIRIUM_BUILD_COMMIT "local"
+#endif
+
 static constexpr int kStellAiriumDebugStage = STELLAIRIUM_DEBUG_STAGE;
+static const char* kStellAiriumBuildMode = STELLAIRIUM_BUILD_MODE;
+static const char* kStellAiriumBuildCommit = STELLAIRIUM_BUILD_COMMIT;
 
 AuroraAircraft::AuroraAircraft()
 	: networkMgr(nullptr)
@@ -296,9 +306,19 @@ void AuroraAircraft::ensureConfigDialog()
 void AuroraAircraft::init()
 {
 #ifdef STELLAIRIUM_SMOKE_TEST
+	qDebug() << "[StellAirium] build signature"
+	         << "mode=" << kStellAiriumBuildMode
+	         << "stage=" << kStellAiriumDebugStage
+	         << "commit=" << kStellAiriumBuildCommit
+	         << "version=" << AURORAAIRCRAFT_PLUGIN_VERSION;
 	qDebug() << "[StellAirium] smoke init()";
 	return;
 #else
+	qDebug() << "[StellAirium] build signature"
+	         << "mode=" << kStellAiriumBuildMode
+	         << "stage=" << kStellAiriumDebugStage
+	         << "commit=" << kStellAiriumBuildCommit
+	         << "version=" << AURORAAIRCRAFT_PLUGIN_VERSION;
 	qDebug() << "[StellAirium] init() start stage" << kStellAiriumDebugStage;
 	deinitRequested = false;
 	QTimer::singleShot(0, this, &AuroraAircraft::finishInit);
