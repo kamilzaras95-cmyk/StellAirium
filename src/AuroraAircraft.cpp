@@ -104,6 +104,7 @@ AuroraAircraft::AuroraAircraft()
 	, objectMgrRegistered(false)
 	, coreConnected(false)
 	, initialFetchDone(false)
+	, runtimeProbeArmed(false)
 {
 	setObjectName("StellAirium");
 
@@ -321,6 +322,7 @@ void AuroraAircraft::init()
 	         << "version=" << AURORAAIRCRAFT_PLUGIN_VERSION;
 	qDebug() << "[StellAirium] init() start stage" << kStellAiriumDebugStage;
 	deinitRequested = false;
+	runtimeProbeArmed = false;
 	QTimer::singleShot(0, this, &AuroraAircraft::finishInit);
 #endif
 }
@@ -336,6 +338,7 @@ void AuroraAircraft::deinit()
 	objectMgrRegistered = false;
 	coreConnected = false;
 	initialFetchDone = false;
+	runtimeProbeArmed = false;
 	if (inFlightReply)
 		inFlightReply->abort();
 	if (fetchTimer)
@@ -382,8 +385,13 @@ void AuroraAircraft::finishInit()
 
 	if (kStellAiriumDebugStage >= 2)
 	{
+		qDebug() << "[StellAirium] init() — arm runtime probe in 3000 ms";
+		QTimer::singleShot(3000, this, [this]() {
+			runtimeProbeArmed = true;
+			qDebug() << "[StellAirium] runtime probe armed";
+		});
 		qDebug() << "[StellAirium] init() — schedule first fetch heartbeat";
-		QTimer::singleShot(1000, this, &AuroraAircraft::fetchAircraft);
+		QTimer::singleShot(3500, this, &AuroraAircraft::fetchAircraft);
 	}
 }
 
@@ -393,6 +401,15 @@ void AuroraAircraft::ensureRuntimeWiring()
 	static int wiringHeartbeatCount = 0;
 	if (deinitRequested)
 		return;
+	if (!runtimeProbeArmed)
+	{
+		if (wiringHeartbeatCount < 5)
+		{
+			++wiringHeartbeatCount;
+			qDebug() << "[StellAirium] ensureRuntimeWiring deferred: runtime probe not armed yet";
+		}
+		return;
+	}
 
 	if (!coreConnected)
 	{
@@ -501,6 +518,11 @@ void AuroraAircraft::fetchAircraft()
 #else
 	if (kStellAiriumDebugStage < 2)
 		return;
+	if (!runtimeProbeArmed)
+	{
+		qDebug() << "[StellAirium] fetch skipped: runtime probe not armed";
+		return;
+	}
 
 	ensureRuntimeWiring();
 	if (!networkMgr)

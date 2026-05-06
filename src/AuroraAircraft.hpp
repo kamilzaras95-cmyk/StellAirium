@@ -130,6 +130,7 @@ private:
 	bool objectMgrRegistered;
 	bool coreConnected;
 	bool initialFetchDone;
+	bool runtimeProbeArmed;
 };
 
 
