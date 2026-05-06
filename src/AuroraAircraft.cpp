@@ -105,7 +105,7 @@ AuroraAircraft::AuroraAircraft()
 	, coreConnected(false)
 	, initialFetchDone(false)
 {
-	setObjectName("AuroraAircraft");
+	setObjectName("StellAirium");
 
 	QSettings s("astronow.pl", "AuroraAircraft");
 	distNm            = s.value("distNm",            250).toInt();
