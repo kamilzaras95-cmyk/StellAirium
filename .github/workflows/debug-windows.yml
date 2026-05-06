@@ -61,22 +61,27 @@ jobs:
           Add-Content stellarium-src\plugins\CMakeLists.txt "`nADD_SUBDIRECTORY(StellAirium)"
 
       - name: CMake configure
+        shell: pwsh
         env:
           SMOKE_FLAG: ${{ github.event.inputs.build_mode == 'smoke' && 'ON' || 'OFF' }}
           DEBUG_STAGE: ${{ github.event.inputs.debug_stage || '1' }}
           BUILD_MODE: ${{ github.event.inputs.build_mode || 'smoke' }}
           BUILD_COMMIT: ${{ github.sha }}
         run: |
+          Write-Host "SMOKE_FLAG=$env:SMOKE_FLAG"
+          Write-Host "DEBUG_STAGE=$env:DEBUG_STAGE"
+          Write-Host "BUILD_MODE=$env:BUILD_MODE"
+          Write-Host "BUILD_COMMIT=$env:BUILD_COMMIT"
           cmake -B stellarium-src/build -S stellarium-src `
             -DCMAKE_BUILD_TYPE=Release `
             -DENABLE_SCRIPTING=OFF `
             -DENABLE_QTWEBENGINE=OFF `
             -DENABLE_SHOWMYSKY=OFF `
             -DENABLE_TESTING=OFF `
-            -DSTELLAIRIUM_SMOKE_TEST=$env:SMOKE_FLAG `
-            -DSTELLAIRIUM_DEBUG_STAGE=$env:DEBUG_STAGE `
-            -DSTELLAIRIUM_BUILD_MODE=$env:BUILD_MODE `
-            -DSTELLAIRIUM_BUILD_COMMIT=$env:BUILD_COMMIT
+            "-DSTELLAIRIUM_SMOKE_TEST=$env:SMOKE_FLAG" `
+            "-DSTELLAIRIUM_DEBUG_STAGE=$env:DEBUG_STAGE" `
+            "-DSTELLAIRIUM_BUILD_MODE=$env:BUILD_MODE" `
+            "-DSTELLAIRIUM_BUILD_COMMIT=$env:BUILD_COMMIT"
 
       - name: Build StellAirium module
         run: cmake --build stellarium-src/build --target StellAirium --config Release -j $env:NUMBER_OF_PROCESSORS
