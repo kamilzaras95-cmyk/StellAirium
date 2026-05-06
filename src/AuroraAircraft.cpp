@@ -450,6 +450,16 @@ void AuroraAircraft::update(double deltaTime)
 		Q_UNUSED(deltaTime);
 		return;
 	}
+	if (kStellAiriumDebugStage == 2)
+	{
+		if (updateHeartbeatCount < 5)
+		{
+			++updateHeartbeatCount;
+			qDebug() << "[StellAirium] update stage 2 noop heartbeat" << updateHeartbeatCount
+			         << "deltaTime=" << deltaTime;
+		}
+		return;
+	}
 
 	if (updateHeartbeatCount < 5)
 	{
@@ -460,8 +470,12 @@ void AuroraAircraft::update(double deltaTime)
 		         << "initCompleted=" << initCompleted
 		         << "aircraft=" << aircraft.size();
 	}
+	if (kStellAiriumDebugStage == 3)
+		return;
 
 	ensureRuntimeWiring();
+	if (kStellAiriumDebugStage == 4)
+		return;
 	if (!initialFetchDone && initCompleted && networkMgr && coreConnected)
 	{
 		qDebug() << "[StellAirium] update() — first fetch gate opened";
@@ -516,7 +530,7 @@ void AuroraAircraft::fetchAircraft()
 #ifdef STELLAIRIUM_SMOKE_TEST
 	return;
 #else
-	if (kStellAiriumDebugStage < 2)
+	if (kStellAiriumDebugStage < 5)
 		return;
 	if (!runtimeProbeArmed)
 	{
@@ -645,7 +659,7 @@ bool AuroraAircraft::configureGui(bool show)
 	Q_UNUSED(show);
 	return false;
 #else
-	if (kStellAiriumDebugStage < 4)
+	if (kStellAiriumDebugStage < 7)
 	{
 		Q_UNUSED(show);
 		return false;
@@ -678,7 +692,7 @@ void AuroraAircraft::onLocationChanged(const StelLocation& loc)
 	Q_UNUSED(loc);
 	return;
 #else
-	if (kStellAiriumDebugStage < 2)
+	if (kStellAiriumDebugStage < 5)
 	{
 		Q_UNUSED(loc);
 		return;
@@ -698,7 +712,7 @@ void AuroraAircraft::draw(StelCore* core)
 	return;
 #else
 	static int drawHeartbeatCount = 0;
-	if (kStellAiriumDebugStage < 3)
+	if (kStellAiriumDebugStage < 6)
 	{
 		Q_UNUSED(core);
 		return;
@@ -728,7 +742,7 @@ void AuroraAircraft::draw(StelCore* core)
 	                      .arg(aircraftCount);
 	p2d.drawText(vw - 280.0f, 18.0f, badge);
 
-	if (kStellAiriumDebugStage < 4)
+	if (kStellAiriumDebugStage < 7)
 		return;
 
 	if (aircraft.isEmpty())
@@ -741,18 +755,18 @@ void AuroraAircraft::draw(StelCore* core)
 	fontLabel.setPixelSize(13);
 	pSky.setFont(fontLabel);
 
-	if (kStellAiriumDebugStage < 5)
+	if (kStellAiriumDebugStage < 8)
 		return;
 
 	bool useTexture = false;
 	bool drawSprite = false;
 	bool drawLabels = false;
 
-	if (kStellAiriumDebugStage >= 5)
+	if (kStellAiriumDebugStage >= 8)
 		drawLabels = true;
-	if (kStellAiriumDebugStage >= 6)
+	if (kStellAiriumDebugStage >= 9)
 		useTexture = true;
-	if (kStellAiriumDebugStage >= 7)
+	if (kStellAiriumDebugStage >= 10)
 		drawSprite = true;
 
 	if (useTexture)

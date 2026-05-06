@@ -16,7 +16,7 @@ on:
         required: false
         default: smoke
       debug_stage:
-        description: Full-mode debug stage (1-7)
+        description: Full-mode debug stage (1-10)
         required: false
         default: '1'
 
